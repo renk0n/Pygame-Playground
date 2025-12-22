@@ -38,7 +38,7 @@ def main():
         c = pg.Color('GREEN')
         if shape_type == 0:
             # 円 (描画先,色,(中心X,中心Y),半径)
-            pg.draw.circle(screen, c, [x, y], rr)
+            pg.draw.circle(screen, c, (x, y), rr)
         elif shape_type == 1:
             # 四角形 (描画先,色,(左上X,左上Y,幅,高さ))
             pg.draw.rect(screen, c, (x, y, rr, rr))
