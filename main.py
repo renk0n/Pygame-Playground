@@ -1,9 +1,7 @@
 import pygame
 import sys
 from settings import *
-from sprites import Player, Enemy, Bullet
-
-# 文字描画関数
+from sprites import Player, Enemy, Bullet, Star  # Starを追加
 
 
 def draw_text(screen, text, size, x, y, color=WHITE):
@@ -13,8 +11,6 @@ def draw_text(screen, text, size, x, y, color=WHITE):
     text_rect = text_surface.get_rect()
     text_rect.midtop = (x, y)
     screen.blit(text_surface, text_rect)
-
-# スタート画面
 
 
 def show_start_screen(screen):
@@ -58,7 +54,6 @@ def show_start_screen(screen):
                     selected_index = 0
                 if event.key == pygame.K_DOWN:
                     selected_index = 1
-                # ★修正：エンターキー（RETURN）のみで開始
                 if event.key == pygame.K_RETURN:
                     return selected_index
 
@@ -73,16 +68,21 @@ def main():
     while game_running:
         mode = show_start_screen(screen)
 
-        # --- ゲーム開始初期化 ---
+        # --- グループ作成 ---
         all_sprites = pygame.sprite.Group()
         mobs = pygame.sprite.Group()
         bullets = pygame.sprite.Group()
+        stars = pygame.sprite.Group()  # ★星専用グループ
 
-        # プレイヤー生成
+        # ★星を100個生成
+        for i in range(100):
+            s = Star()
+            all_sprites.add(s)
+            stars.add(s)
+
         player = Player(all_sprites, bullets)
         all_sprites.add(player)
 
-        # 敵生成関数
         def new_mob():
             m = Enemy()
             all_sprites.add(m)
@@ -92,88 +92,72 @@ def main():
             new_mob()
 
         score = 0
-        lives = 2  # ★残機：2機（死ぬと減る）
-        death_time = 0  # 死んだ時刻を記録する変数
+        lives = 2
+        death_time = 0
 
-        # --- ステージループ ---
         run_level = True
         while run_level:
             clock.tick(FPS)
 
-            # イベント処理
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run_level = False
                     game_running = False
                 elif event.type == pygame.KEYDOWN:
-                    # プレイヤーが生きてる時だけ発射可能
                     if event.key == pygame.K_SPACE and player.alive():
                         player.shoot()
 
-            # 更新
             all_sprites.update()
 
-            # 衝突判定：弾 -> 敵
             hits = pygame.sprite.groupcollide(mobs, bullets, True, True)
             for hit in hits:
                 score += 100
                 new_mob()
 
-            # 衝突判定：敵 -> プレイヤー（プレイヤーが生きてる時のみ）
             if player.alive():
                 hits = pygame.sprite.spritecollide(player, mobs, False)
                 if hits:
-                    player.kill()  # プレイヤーを消す
-                    lives -= 1    # 残機を減らす
-                    death_time = pygame.time.get_ticks()  # 死んだ時間を記録
+                    player.kill()
+                    lives -= 1
+                    death_time = pygame.time.get_ticks()
 
-            # ★プレイヤー死亡中の処理
             if not player.alive():
                 now = pygame.time.get_ticks()
-
-                # --- ゲームオーバー処理（残機がマイナスになったら）---
                 if lives < 0:
-                    # 5秒 (5000ms) 経過したらタイトルへ
                     if now - death_time > 5000:
                         run_level = False
                     else:
-                        # 画面下にGAME OVER表示
                         draw_text(screen, "GAME OVER", 40,
                                   WIDTH // 2, HEIGHT - 100, RED)
-
-                # --- リスポーン処理（残機があるなら）---
                 else:
-                    # 2秒 (2000ms) 経過したら復活
                     if now - death_time > 2000:
-                        # ブラックアウト的なリセット処理
-                        # 全てのスプライトを一度消す（敵も弾も）
-                        all_sprites.empty()
+                        # リスポーン処理
+                        # 星以外のスプライトを削除（星は残す）
+                        for sprite in all_sprites:
+                            if sprite not in stars:
+                                sprite.kill()
+
                         mobs.empty()
                         bullets.empty()
 
-                        # プレイヤー再生成
                         player = Player(all_sprites, bullets)
                         all_sprites.add(player)
 
-                        # 敵を再配置
                         for i in range(8):
                             new_mob()
 
-                        # 一瞬画面を黒くしてリセット感を出す（任意）
                         screen.fill(BLACK)
                         pygame.display.flip()
-                        pygame.time.wait(200)  # 0.2秒だけ止める
+                        pygame.time.wait(200)
 
             # 描画
-            # ゲームオーバー時以外は通常描画（ゲームオーバー時は文字を上書きするためfill後に描画）
             if lives >= 0 or (lives < 0 and pygame.time.get_ticks() - death_time <= 5000):
                 screen.fill(BLACK)
-                all_sprites.draw(screen)
-                # UI表示
+                all_sprites.draw(screen)  # 星もここで描画される（先に追加したので奥に表示）
+
                 draw_text(screen, f"SCORE: {score}", 18, WIDTH // 2, 10, WHITE)
                 draw_text(screen, f"LIVES: {lives}", 18, WIDTH - 60, 10, WHITE)
 
-                # ゲームオーバーの文字を再描画（draw順序のため）
                 if lives < 0:
                     draw_text(screen, "GAME OVER", 40,
                               WIDTH // 2, HEIGHT - 100, RED)
