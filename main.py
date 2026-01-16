@@ -3,6 +3,8 @@ import sys
 from settings import *
 from sprites import Player, Enemy, Bullet
 
+# 文字描画関数
+
 
 def draw_text(screen, text, size, x, y, color=WHITE):
     font_name = pygame.font.match_font('arial')
@@ -12,18 +14,14 @@ def draw_text(screen, text, size, x, y, color=WHITE):
     text_rect.midtop = (x, y)
     screen.blit(text_surface, text_rect)
 
-# スタート画面関数（戻り値で選んだモードを返すように変更）
+# スタート画面
 
 
 def show_start_screen(screen):
-    # メニューの選択状態（0: 1P, 1: 2P）
     selected_index = 0
-
     waiting = True
     while waiting:
         screen.fill(BLACK)
-
-        # --- タイトル描画 ---
         draw_text(screen, "Konami", 30, WIDTH // 2, HEIGHT // 6, WHITE)
         draw_text(screen, "GRADIUS", 80, WIDTH //
                   2 + 4, HEIGHT // 4 + 4, (200, 0, 0))
@@ -34,8 +32,6 @@ def show_start_screen(screen):
         draw_text(screen, "HI  0050000", 25, WIDTH //
                   2, HEIGHT // 2 + 40, (255, 100, 100))
 
-        # --- メニュー項目描画 ---
-        # 選ばれている方は白、選ばれていない方は灰色にする演出
         color_1p = WHITE if selected_index == 0 else (100, 100, 100)
         color_2p = WHITE if selected_index == 1 else (100, 100, 100)
 
@@ -43,39 +39,24 @@ def show_start_screen(screen):
         draw_text(screen, "2 PLAYERS", 30, WIDTH //
                   2, HEIGHT * 3 / 4 + 40, color_2p)
 
-        # --- 矢印（カーソル）の描画 ---
-        # 基準となるY座標（1 PLAYERの横）
-        base_y = HEIGHT * 3 / 4 + 10
-        # 2 PLAYERなら 40px 下にずらす
-        cursor_y = base_y + (40 * selected_index)
-
+        cursor_y = (HEIGHT * 3 / 4 + 10) + (40 * selected_index)
         cursor_x = WIDTH // 2 - 100
-
-        # 三角形を描く
-        pygame.draw.polygon(screen, WHITE, [
-            (cursor_x, cursor_y),
-            (cursor_x, cursor_y + 20),
-            (cursor_x + 20, cursor_y + 10)
-        ])
+        pygame.draw.polygon(screen, WHITE, [(
+            cursor_x, cursor_y), (cursor_x, cursor_y + 20), (cursor_x + 20, cursor_y + 10)])
 
         pygame.display.flip()
 
-        # --- キー入力処理 ---
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-
             if event.type == pygame.KEYDOWN:
-                # 上キーまたは下キーで選択を切り替え
                 if event.key == pygame.K_UP:
-                    selected_index = 0  # 1Pへ
+                    selected_index = 0
                 if event.key == pygame.K_DOWN:
-                    selected_index = 1  # 2Pへ
-
-                # 決定キー
+                    selected_index = 1
                 if event.key == pygame.K_SPACE or event.key == pygame.K_RETURN:
-                    return selected_index  # 選んだ番号（0か1）を返して終了
+                    return selected_index
 
 
 def main():
@@ -86,20 +67,17 @@ def main():
 
     game_running = True
     while game_running:
-        # スタート画面を表示し、プレイヤーの選択結果を受け取る
-        # mode は 0 (1P) か 1 (2P) になる
         mode = show_start_screen(screen)
 
-        # 現状はどちらを選んでも同じゲームが始まりますが
-        # ここで if mode == 1: などとすれば2Pモードへの分岐が可能です
-
-        # --- ゲーム本編の準備 ---
+        # --- ゲーム開始準備 ---
         all_sprites = pygame.sprite.Group()
         mobs = pygame.sprite.Group()
         bullets = pygame.sprite.Group()
-
         player = Player(all_sprites, bullets)
         all_sprites.add(player)
+
+        # ★スコア変数を初期化
+        score = 0
 
         def new_mob():
             m = Enemy()
@@ -109,7 +87,7 @@ def main():
         for i in range(8):
             new_mob()
 
-        # --- ゲームプレイ ---
+        # --- ゲーム本編ループ ---
         run_level = True
         while run_level:
             clock.tick(FPS)
@@ -124,16 +102,24 @@ def main():
 
             all_sprites.update()
 
+            # ★敵と弾の衝突判定
             hits = pygame.sprite.groupcollide(mobs, bullets, True, True)
             for hit in hits:
-                new_mob()
+                score += 100  # ★100点加算
+                new_mob()     # 敵を補充
 
+            # 敵とプレイヤーの衝突判定
             hits = pygame.sprite.spritecollide(player, mobs, False)
             if hits:
-                run_level = False
+                run_level = False  # ゲームオーバー
 
+            # 描画
             screen.fill(BLACK)
             all_sprites.draw(screen)
+
+            # ★スコア表示 (画面上部中央)
+            draw_text(screen, str(score), 18, WIDTH // 2, 10, WHITE)
+
             pygame.display.flip()
 
     pygame.quit()
