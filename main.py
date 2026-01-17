@@ -1,7 +1,11 @@
 import pygame
 import sys
+import os  # ファイル読み書きのために追加
 from settings import *
-from sprites import Player, Enemy, Bullet, Star  # Starを追加
+from sprites import Player, Enemy, Bullet, Star
+
+# ハイスコアを保存するファイル名
+HS_FILE = "highscore.txt"
 
 
 def draw_text(screen, text, size, x, y, color=WHITE):
@@ -12,8 +16,29 @@ def draw_text(screen, text, size, x, y, color=WHITE):
     text_rect.midtop = (x, y)
     screen.blit(text_surface, text_rect)
 
+# ハイスコア読み込み関数
 
-def show_start_screen(screen):
+
+def load_high_score():
+    try:
+        # ファイルがあれば中身を読み込んで整数にする
+        with open(HS_FILE, 'r') as f:
+            return int(f.read())
+    except:
+        # ファイルがない（初めて遊ぶ）場合は0を返す
+        return 0
+
+# ハイスコア保存関数
+
+
+def save_high_score(score):
+    with open(HS_FILE, 'w') as f:
+        f.write(str(score))
+
+# スタート画面（引数に high_score を追加）
+
+
+def show_start_screen(screen, high_score):
     selected_index = 0
     waiting = True
     while waiting:
@@ -25,8 +50,10 @@ def show_start_screen(screen):
                   2, HEIGHT // 4, (0, 100, 255))
         draw_text(screen, "(c) KONAMI 1986", 20,
                   WIDTH // 2, HEIGHT // 2, WHITE)
-        draw_text(screen, "HI  0050000", 25, WIDTH //
-                  2, HEIGHT // 2 + 40, (255, 100, 100))
+
+        # ★ハイスコアを表示（7桁でゼロ埋め表示）
+        draw_text(screen, f"HI  {high_score:07}", 25,
+                  WIDTH // 2, HEIGHT // 2 + 40, (255, 100, 100))
 
         color_1p = WHITE if selected_index == 0 else (100, 100, 100)
         color_2p = WHITE if selected_index == 1 else (100, 100, 100)
@@ -64,17 +91,20 @@ def main():
     pygame.display.set_caption(TITLE)
     clock = pygame.time.Clock()
 
+    # ★ゲーム起動時にハイスコアをロード
+    high_score = load_high_score()
+
     game_running = True
     while game_running:
-        mode = show_start_screen(screen)
+        # スタート画面にハイスコアを渡す
+        mode = show_start_screen(screen, high_score)
 
-        # --- グループ作成 ---
+        # --- ゲーム開始初期化 ---
         all_sprites = pygame.sprite.Group()
         mobs = pygame.sprite.Group()
         bullets = pygame.sprite.Group()
-        stars = pygame.sprite.Group()  # ★星専用グループ
+        stars = pygame.sprite.Group()
 
-        # ★星を100個生成
         for i in range(100):
             s = Star()
             all_sprites.add(s)
@@ -124,6 +154,11 @@ def main():
             if not player.alive():
                 now = pygame.time.get_ticks()
                 if lives < 0:
+                    # ★ゲームオーバー確定時にハイスコア更新判定
+                    if score > high_score:
+                        high_score = score
+                        save_high_score(high_score)  # ファイルに書き込み
+
                     if now - death_time > 5000:
                         run_level = False
                     else:
@@ -132,7 +167,6 @@ def main():
                 else:
                     if now - death_time > 2000:
                         # リスポーン処理
-                        # 星以外のスプライトを削除（星は残す）
                         for sprite in all_sprites:
                             if sprite not in stars:
                                 sprite.kill()
@@ -153,14 +187,20 @@ def main():
             # 描画
             if lives >= 0 or (lives < 0 and pygame.time.get_ticks() - death_time <= 5000):
                 screen.fill(BLACK)
-                all_sprites.draw(screen)  # 星もここで描画される（先に追加したので奥に表示）
+                all_sprites.draw(screen)
 
                 draw_text(screen, f"SCORE: {score}", 18, WIDTH // 2, 10, WHITE)
+                # ゲーム中も右端などにハイスコアを出したい場合はここに追加可能
+                # draw_text(screen, f"HI: {high_score}", 18, WIDTH - 150, 10, WHITE)
                 draw_text(screen, f"LIVES: {lives}", 18, WIDTH - 60, 10, WHITE)
 
                 if lives < 0:
                     draw_text(screen, "GAME OVER", 40,
                               WIDTH // 2, HEIGHT - 100, RED)
+                    # ハイスコア更新時はメッセージを出すと嬉しいかも
+                    if score >= high_score and score > 0:
+                        draw_text(screen, "NEW HIGH SCORE!", 30,
+                                  WIDTH // 2, HEIGHT - 150, YELLOW)
 
             pygame.display.flip()
 
