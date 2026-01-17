@@ -2,7 +2,7 @@ import pygame
 import sys
 import random
 from settings import *
-from sprites import Player, Enemy, Bullet, Star, Mountain, Wall
+from sprites import Player, Enemy, Bullet, Star, Mountain, Wall, FormationEnemy
 
 HS_FILE = "highscore.txt"
 
@@ -70,7 +70,7 @@ def show_start_screen(screen, high_score):
                 if event.key == pygame.K_RETURN:
                     return selected_index
 
-# ★初期化用関数（時間を受け取って地形をセットする）
+# 初期化用関数
 
 
 def init_stage_objects(current_time, all_sprites, stars, hazards):
@@ -78,14 +78,14 @@ def init_stage_objects(current_time, all_sprites, stars, hazards):
     stars.empty()
     hazards.empty()
 
-    # Stage 1〜2エリア (星)
+    # Stage 1〜2エリア
     if current_time < TIME_STAGE3:
         for i in range(50):
             s = Star(from_right=False)
             all_sprites.add(s)
             stars.add(s)
 
-    # Stage 2エリア (山)
+    # Stage 2エリア
     if TIME_STAGE2 <= current_time < TIME_STAGE3:
         for i in range(3):
             m = Mountain(is_top=True, from_right=False)
@@ -95,7 +95,7 @@ def init_stage_objects(current_time, all_sprites, stars, hazards):
             all_sprites.add(m)
             hazards.add(m)
 
-    # Stage 3エリア (壁)
+    # Stage 3エリア
     if current_time >= TIME_STAGE3:
         for i in range(5):
             w = Wall(is_top=True, from_right=False)
@@ -124,30 +124,61 @@ def main():
         hazards = pygame.sprite.Group()
 
         player = Player(all_sprites, bullets)
-        all_sprites.add(player)
 
         score = 0
         lives = 2
         death_time = 0
-
-        # ★経過時間管理変数（ミリ秒）
         current_time = 0
 
         init_stage_objects(current_time, all_sprites, stars, hazards)
         all_sprites.add(player)
 
-        # 敵生成タイマー
-        pygame.time.set_timer(pygame.USEREVENT + 1, 1500)
         # 地形生成タイマー
         pygame.time.set_timer(pygame.USEREVENT + 2, 800)
 
+        # 敵の出現スケジュール
+        # 上, 下, 上, 下, 上
+        base_script = [
+            {'time': 2000, 'pos': 'top'},
+            {'time': 4000, 'pos': 'bottom'},
+            {'time': 6000, 'pos': 'top'},
+            {'time': 8000, 'pos': 'bottom'},
+            {'time': 10000, 'pos': 'top'}
+        ]
+        enemy_script = list(base_script)
+
         run_level = True
         while run_level:
-            # ★1フレームの経過時間を取得して加算
             dt = clock.tick(FPS)
-            # プレイヤーが生きてる間だけ時間を進める（死んでる間は進めないほうが自然かも）
+
             if player.alive():
                 current_time += dt
+
+                # スクリプトに基づく敵出現処理
+                if len(enemy_script) > 0:
+                    next_spawn = enemy_script[0]
+                    if current_time >= next_spawn['time']:
+                        pos_key = next_spawn['pos']
+
+                        start_y = 0
+                        y_dir = 1  # デフォルトは下へ(top出現時)
+
+                        if pos_key == 'top':
+                            start_y = HEIGHT // 4
+                            y_dir = 1
+                        else:
+                            start_y = HEIGHT * 3 // 4
+                            y_dir = -1  # 下から出る時は上へ戻る
+
+                        # 4体編隊を生成
+                        for i in range(4):
+                            # 間隔を30pxに狭めて「1111」のように連ならせる
+                            offset = i * 30
+                            fe = FormationEnemy(offset, start_y, y_dir)
+                            all_sprites.add(fe)
+                            mobs.add(fe)
+
+                        enemy_script.pop(0)
 
             # イベント処理
             for event in pygame.event.get():
@@ -158,22 +189,14 @@ def main():
                     if event.key == pygame.K_SPACE and player.alive():
                         player.shoot()
 
-                # --- 敵の出現 ---
-                elif event.type == pygame.USEREVENT + 1:
-                    m = Enemy()
-                    all_sprites.add(m)
-                    mobs.add(m)
-
-                # --- 地形/星の出現（時間ベースで判定） ---
+                # 地形/星の出現
                 elif event.type == pygame.USEREVENT + 2:
-                    # 1. 星 (Stage 3未満)
                     if current_time < TIME_STAGE3:
                         if random.random() < 0.8:
                             s = Star(from_right=True)
                             all_sprites.add(s)
                             stars.add(s)
 
-                    # 2. 山 (Stage 2の間)
                     if TIME_STAGE2 <= current_time < TIME_STAGE3:
                         if random.random() < 0.6:
                             m_top = Mountain(is_top=True, from_right=True)
@@ -183,7 +206,6 @@ def main():
                             all_sprites.add(m_btm)
                             hazards.add(m_btm)
 
-                    # 3. 壁 (Stage 3以降)
                     if current_time >= TIME_STAGE3:
                         w_top = Wall(is_top=True, from_right=True)
                         all_sprites.add(w_top)
@@ -221,22 +243,22 @@ def main():
                                   WIDTH // 2, HEIGHT - 100, RED)
                 else:
                     if now - death_time > 2000:
-                        # ★チェックポイント復活処理
+                        # チェックポイント復活
                         mobs.empty()
                         bullets.empty()
 
-                        # どのステージで死んだかによって時間を巻き戻す
                         if current_time >= TIME_STAGE3:
-                            current_time = TIME_STAGE3  # ステージ3の頭
+                            current_time = TIME_STAGE3
                         elif current_time >= TIME_STAGE2:
-                            current_time = TIME_STAGE2  # ステージ2の頭
+                            current_time = TIME_STAGE2
                         else:
-                            current_time = 0  # ステージ1の頭
+                            current_time = 0
 
-                        # その時間の状態に地形をリセット
+                        enemy_script = [
+                            e for e in base_script if e['time'] > current_time]
+
                         init_stage_objects(
                             current_time, all_sprites, stars, hazards)
-
                         player = Player(all_sprites, bullets)
                         all_sprites.add(player)
 
@@ -256,16 +278,11 @@ def main():
                 draw_text(screen, f"SCORE: {score}", 18, WIDTH // 2, 10, WHITE)
                 draw_text(screen, f"LIVES: {lives}", 18, WIDTH - 60, 10, WHITE)
 
-                # 現在のステージ表示（時間判定）
                 stage_name = "SPACE"
                 if current_time >= TIME_STAGE3:
                     stage_name = "BASE"
                 elif current_time >= TIME_STAGE2:
                     stage_name = "PLANET"
-
-                # 右下に残り時間（次のステージまで）を表示すると親切かも
-                # draw_text(screen, stage_name, 14, 40, HEIGHT - 20, GREY)
-                # 今回はステージ名だけ表示
                 draw_text(screen, stage_name, 14, 40, HEIGHT - 20, GREY)
 
                 if lives < 0:

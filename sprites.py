@@ -1,5 +1,6 @@
 import pygame
 import random
+import math
 from settings import *
 
 # ==========================================
@@ -55,7 +56,7 @@ class Player(pygame.sprite.Sprite):
         self.bullets.add(bullet)
 
 # ==========================================
-# 敵
+# 普通の敵 (クラス定義のみ保持)
 # ==========================================
 
 
@@ -65,16 +66,71 @@ class Enemy(pygame.sprite.Sprite):
         self.image = pygame.Surface((30, 30))
         self.image.fill(RED)
         self.rect = self.image.get_rect()
-        # 敵は常に画面右外から出現させる
         self.rect.x = random.randrange(WIDTH + 10, WIDTH + 100)
         self.rect.y = random.randrange(50, HEIGHT - 50)
         self.speedx = random.randrange(ENEMY_SPEED_MIN, ENEMY_SPEED_MAX)
 
     def update(self):
         self.rect.x -= self.speedx
-        # 画面左に消えたら削除してメモリ節約（再利用しない）
         if self.rect.right < 0:
             self.kill()
+
+# ==========================================
+# ★編隊を組む敵 (玉)
+# ==========================================
+
+
+class FormationEnemy(pygame.sprite.Sprite):
+    def __init__(self, offset_x, start_y, y_direction):
+        super().__init__()
+        self.radius = 15
+        self.image = pygame.Surface(
+            (self.radius * 2, self.radius * 2), pygame.SRCALPHA)
+        pygame.draw.circle(self.image, (0, 255, 255),
+                           (self.radius, self.radius), self.radius)
+        self.rect = self.image.get_rect()
+
+        # スタート位置
+        self.rect.x = WIDTH + offset_x
+        self.rect.y = start_y
+
+        self.speed = 6
+        self.state = 0
+        self.turn_timer = 0
+        self.y_direction = y_direction
+
+    def update(self):
+        # State 0: 左へ進む
+        if self.state == 0:
+            self.rect.x -= self.speed
+            # 画面中央より少し奥で折り返し
+            if self.rect.centerx < (WIDTH // 2) - 100:
+                self.state = 1
+                self.turn_timer = pygame.time.get_ticks()
+
+        # State 1: 斜めへ折り返す
+        elif self.state == 1:
+            self.rect.x += self.speed
+            self.rect.y += (self.speed * 0.6) * self.y_direction
+
+            if pygame.time.get_ticks() - self.turn_timer > 500:
+                self.state = 2
+
+        # State 2: そのまま右へ抜ける
+        elif self.state == 2:
+            self.rect.x += self.speed
+
+        # --- 修正箇所: 画面外判定のロジック変更 ---
+        # 「右へ帰っていく時(state 2)」だけ、画面右外に出たら消す
+        # そうしないと、登場時(state 0)に画面右外にいる後続の敵が消されてしまう
+        if self.state == 2 and self.rect.left > WIDTH:
+            self.kill()
+
+        # 上下の画面外判定はいつでも有効
+        elif self.rect.top > HEIGHT or self.rect.bottom < 0:
+            self.kill()
+
+        # (左端の判定は入れていませんが、この敵は左へ抜け切ることはないので不要です)
 
 # ==========================================
 # 弾
@@ -111,10 +167,8 @@ class Star(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
 
         if from_right:
-            # ゲーム中は右端から生まれる
             self.rect.x = WIDTH + random.randrange(0, 50)
         else:
-            # ゲーム開始時は画面全体に散らばる
             self.rect.x = random.randrange(WIDTH)
 
         self.rect.y = random.randrange(HEIGHT)
@@ -123,7 +177,7 @@ class Star(pygame.sprite.Sprite):
     def update(self):
         self.rect.x += self.speedx
         if self.rect.right < 0:
-            self.kill()  # 画面外に出たら消す
+            self.kill()
 
 # ==========================================
 # Stage 2: 山
@@ -156,7 +210,7 @@ class Mountain(pygame.sprite.Sprite):
         else:
             self.rect.bottom = HEIGHT
 
-        self.speedx = -3  # 背景スクロール速度
+        self.speedx = -3
 
     def update(self):
         self.rect.x += self.speedx
