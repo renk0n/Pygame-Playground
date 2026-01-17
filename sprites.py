@@ -125,7 +125,7 @@ class FormationEnemy(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# ★追尾する敵 (紫の三角)
+# 追尾する敵 (紫の三角)
 # ==========================================
 
 
@@ -219,15 +219,17 @@ class Star(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# Stage 2: 山
+# Stage 2: 山 (平坦に変更)
 # ==========================================
 
 
 class Mountain(pygame.sprite.Sprite):
     def __init__(self, is_top, from_right=True):
         super().__init__()
-        width = random.randrange(80, 150)
-        height = random.randrange(50, 120)
+        # ★変更点: 幅を広く、高さを低くして平坦な印象に
+        width = random.randrange(150, 250)
+        height = random.randrange(30, 70)
+
         self.image = pygame.Surface((width, height))
         self.image.set_colorkey(BLACK)
 
