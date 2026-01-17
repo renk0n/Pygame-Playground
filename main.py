@@ -70,24 +70,23 @@ def show_start_screen(screen, high_score):
                 if event.key == pygame.K_RETURN:
                     return selected_index
 
-# ★復活時などの初期化用関数
+# ★初期化用関数（時間を受け取って地形をセットする）
 
 
-def init_stage_objects(score, all_sprites, stars, hazards):
+def init_stage_objects(current_time, all_sprites, stars, hazards):
     all_sprites.empty()
     stars.empty()
     hazards.empty()
 
-    # スコアに応じて初期配置を変える（チェックポイント用）
-    # 星はとりあえずばら撒く
-    if score < SCORE_STAGE3:
+    # Stage 1〜2エリア (星)
+    if current_time < TIME_STAGE3:
         for i in range(50):
             s = Star(from_right=False)
             all_sprites.add(s)
             stars.add(s)
 
-    # ステージ2エリアなら山も少し置いておく
-    if SCORE_STAGE2 <= score < SCORE_STAGE3:
+    # Stage 2エリア (山)
+    if TIME_STAGE2 <= current_time < TIME_STAGE3:
         for i in range(3):
             m = Mountain(is_top=True, from_right=False)
             all_sprites.add(m)
@@ -96,8 +95,8 @@ def init_stage_objects(score, all_sprites, stars, hazards):
             all_sprites.add(m)
             hazards.add(m)
 
-    # ステージ3エリアなら壁を置いておく
-    if score >= SCORE_STAGE3:
+    # Stage 3エリア (壁)
+    if current_time >= TIME_STAGE3:
         for i in range(5):
             w = Wall(is_top=True, from_right=False)
             all_sprites.add(w)
@@ -122,29 +121,33 @@ def main():
         mobs = pygame.sprite.Group()
         bullets = pygame.sprite.Group()
         stars = pygame.sprite.Group()
-        hazards = pygame.sprite.Group()  # 山や壁
+        hazards = pygame.sprite.Group()
 
         player = Player(all_sprites, bullets)
         all_sprites.add(player)
 
-        # 最初の初期化（スコア0の状態）
         score = 0
         lives = 2
         death_time = 0
 
-        init_stage_objects(score, all_sprites, stars, hazards)
-        # プレイヤー追加（initで消えちゃうので再追加）
+        # ★経過時間管理変数（ミリ秒）
+        current_time = 0
+
+        init_stage_objects(current_time, all_sprites, stars, hazards)
         all_sprites.add(player)
 
-        # 敵生成用タイマー
-        pygame.time.set_timer(pygame.USEREVENT + 1, 1500)  # 1.5秒ごとに敵出現
-
-        # ★地形生成用タイマー（これがスクロールの鍵）
-        pygame.time.set_timer(pygame.USEREVENT + 2, 800)  # 0.8秒ごとに地形チェック
+        # 敵生成タイマー
+        pygame.time.set_timer(pygame.USEREVENT + 1, 1500)
+        # 地形生成タイマー
+        pygame.time.set_timer(pygame.USEREVENT + 2, 800)
 
         run_level = True
         while run_level:
-            clock.tick(FPS)
+            # ★1フレームの経過時間を取得して加算
+            dt = clock.tick(FPS)
+            # プレイヤーが生きてる間だけ時間を進める（死んでる間は進めないほうが自然かも）
+            if player.alive():
+                current_time += dt
 
             # イベント処理
             for event in pygame.event.get():
@@ -157,24 +160,22 @@ def main():
 
                 # --- 敵の出現 ---
                 elif event.type == pygame.USEREVENT + 1:
-                    # 敵はどのステージでも出る
                     m = Enemy()
                     all_sprites.add(m)
                     mobs.add(m)
 
-                # --- 地形/星の出現（シームレス生成） ---
+                # --- 地形/星の出現（時間ベースで判定） ---
                 elif event.type == pygame.USEREVENT + 2:
-                    # 1. 星を降らす (Stage 3以外はずっと降る)
-                    if score < SCORE_STAGE3:
-                        if random.random() < 0.8:  # 80%の確率で星追加
+                    # 1. 星 (Stage 3未満)
+                    if current_time < TIME_STAGE3:
+                        if random.random() < 0.8:
                             s = Star(from_right=True)
                             all_sprites.add(s)
                             stars.add(s)
 
-                    # 2. 山を出す (Stage 2の間)
-                    # スコアが近づいたら出し始める (フェードイン効果)
-                    if score >= SCORE_STAGE2 and score < SCORE_STAGE3:
-                        if random.random() < 0.6:  # 60%の確率で山追加
+                    # 2. 山 (Stage 2の間)
+                    if TIME_STAGE2 <= current_time < TIME_STAGE3:
+                        if random.random() < 0.6:
                             m_top = Mountain(is_top=True, from_right=True)
                             all_sprites.add(m_top)
                             hazards.add(m_top)
@@ -182,9 +183,8 @@ def main():
                             all_sprites.add(m_btm)
                             hazards.add(m_btm)
 
-                    # 3. 壁を出す (Stage 3以降)
-                    if score >= SCORE_STAGE3:
-                        # 確実に壁を出し続けて通路にする
+                    # 3. 壁 (Stage 3以降)
+                    if current_time >= TIME_STAGE3:
                         w_top = Wall(is_top=True, from_right=True)
                         all_sprites.add(w_top)
                         hazards.add(w_top)
@@ -194,13 +194,10 @@ def main():
 
             all_sprites.update()
 
-            # 弾 -> 敵
             hits = pygame.sprite.groupcollide(mobs, bullets, True, True)
             for hit in hits:
                 score += 100
-                # 敵を即座に補充せず、タイマーで湧かせるのでここはスコア加算のみ
 
-            # 敵/障害物 -> プレイヤー
             if player.alive():
                 hits_mob = pygame.sprite.spritecollide(player, mobs, False)
                 hits_env = pygame.sprite.spritecollide(player, hazards, False)
@@ -210,7 +207,6 @@ def main():
                     lives -= 1
                     death_time = pygame.time.get_ticks()
 
-            # プレイヤー死亡処理
             if not player.alive():
                 now = pygame.time.get_ticks()
                 if lives < 0:
@@ -225,11 +221,21 @@ def main():
                                   WIDTH // 2, HEIGHT - 100, RED)
                 else:
                     if now - death_time > 2000:
-                        # ★チェックポイント復活
-                        # 全消しして、現在のスコアに応じた地形を再配置
+                        # ★チェックポイント復活処理
                         mobs.empty()
                         bullets.empty()
-                        init_stage_objects(score, all_sprites, stars, hazards)
+
+                        # どのステージで死んだかによって時間を巻き戻す
+                        if current_time >= TIME_STAGE3:
+                            current_time = TIME_STAGE3  # ステージ3の頭
+                        elif current_time >= TIME_STAGE2:
+                            current_time = TIME_STAGE2  # ステージ2の頭
+                        else:
+                            current_time = 0  # ステージ1の頭
+
+                        # その時間の状態に地形をリセット
+                        init_stage_objects(
+                            current_time, all_sprites, stars, hazards)
 
                         player = Player(all_sprites, bullets)
                         all_sprites.add(player)
@@ -240,10 +246,9 @@ def main():
 
             # 描画
             if lives >= 0 or (lives < 0 and pygame.time.get_ticks() - death_time <= 5000):
-                # 背景色は徐々に変えたいが、今はシンプルにステージ3だけ色を変える
                 bg_color = BLACK
-                if score >= SCORE_STAGE3:
-                    bg_color = (20, 20, 40)  # 基地内部色
+                if current_time >= TIME_STAGE3:
+                    bg_color = (20, 20, 40)
 
                 screen.fill(bg_color)
                 all_sprites.draw(screen)
@@ -251,12 +256,16 @@ def main():
                 draw_text(screen, f"SCORE: {score}", 18, WIDTH // 2, 10, WHITE)
                 draw_text(screen, f"LIVES: {lives}", 18, WIDTH - 60, 10, WHITE)
 
-                # 現在のステージ名を右下にこっそり出す
+                # 現在のステージ表示（時間判定）
                 stage_name = "SPACE"
-                if score >= SCORE_STAGE3:
+                if current_time >= TIME_STAGE3:
                     stage_name = "BASE"
-                elif score >= SCORE_STAGE2:
+                elif current_time >= TIME_STAGE2:
                     stage_name = "PLANET"
+
+                # 右下に残り時間（次のステージまで）を表示すると親切かも
+                # draw_text(screen, stage_name, 14, 40, HEIGHT - 20, GREY)
+                # 今回はステージ名だけ表示
                 draw_text(screen, stage_name, 14, 40, HEIGHT - 20, GREY)
 
                 if lives < 0:

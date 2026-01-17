@@ -24,6 +24,7 @@ PLAYER_SPEED = 5
 ENEMY_SPEED_MIN = 3
 ENEMY_SPEED_MAX = 8
 
-# ステージ進行のスコア基準（長くしました）
-SCORE_STAGE2 = 1500   # 1500点で山が見え始める
-SCORE_STAGE3 = 3500   # 3500点で基地に入り始める
+# ★ステージ進行の時間設定 (ミリ秒)
+# 30秒 = 30000ミリ秒
+TIME_STAGE2 = 30000
+TIME_STAGE3 = 60000
