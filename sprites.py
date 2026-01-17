@@ -56,7 +56,7 @@ class Player(pygame.sprite.Sprite):
         self.bullets.add(bullet)
 
 # ==========================================
-# 普通の敵 (クラス定義のみ保持)
+# 普通の敵
 # ==========================================
 
 
@@ -99,26 +99,19 @@ class FormationEnemy(pygame.sprite.Sprite):
         self.y_direction = y_direction
 
     def update(self):
-        # State 0: 左へ
         if self.state == 0:
             self.rect.x -= self.speed
             if self.rect.centerx < (WIDTH // 2) - 100:
                 self.state = 1
                 self.turn_timer = pygame.time.get_ticks()
-
-        # State 1: 斜めへ折り返す
         elif self.state == 1:
             self.rect.x += self.speed
             self.rect.y += (self.speed * 0.6) * self.y_direction
-
             if pygame.time.get_ticks() - self.turn_timer > 500:
                 self.state = 2
-
-        # State 2: そのまま右へ抜ける
         elif self.state == 2:
             self.rect.x += self.speed
 
-        # 画面外判定
         if self.state == 2 and self.rect.left > WIDTH:
             self.kill()
         elif self.rect.top > HEIGHT or self.rect.bottom < 0:
@@ -133,37 +126,27 @@ class TrackingEnemy(pygame.sprite.Sprite):
     def __init__(self, start_y, player, offset_x=0):
         super().__init__()
         self.player = player
-
         size = 30
         self.image = pygame.Surface((size, size), pygame.SRCALPHA)
         points = [(0, size // 2), (size, 0), (size, size)]
         pygame.draw.polygon(self.image, (255, 0, 255), points)
-
         self.rect = self.image.get_rect()
         self.rect.x = WIDTH + offset_x
         self.rect.y = start_y
-
-        # 速度設定
-        self.dash_speed = 6   # 直進時の速さ
-        self.creep_speed = 3  # 斜め移動時の速さ（ゆっくり）
+        self.dash_speed = 6
+        self.creep_speed = 3
 
     def update(self):
         dy = self.player.rect.centery - self.rect.centery
         threshold = 5
 
-        # 斜め移動（位置合わせ）はゆっくり
-        # 直線移動（攻撃）は速く
-
         if dy < -threshold:
-            # 斜め左上 (45度) - ゆっくり
             self.rect.x -= self.creep_speed * 0.7
             self.rect.y -= self.creep_speed * 0.7
         elif dy > threshold:
-            # 斜め左下 (45度) - ゆっくり
             self.rect.x -= self.creep_speed * 0.7
             self.rect.y += self.creep_speed * 0.7
         else:
-            # 直進 - 速い！
             self.rect.x -= self.dash_speed
 
         if self.rect.right < 0:
@@ -204,12 +187,10 @@ class Star(pygame.sprite.Sprite):
         brightness = random.randrange(100, 255)
         self.image.fill((brightness, brightness, brightness))
         self.rect = self.image.get_rect()
-
         if from_right:
             self.rect.x = WIDTH + random.randrange(0, 50)
         else:
             self.rect.x = random.randrange(WIDTH)
-
         self.rect.y = random.randrange(HEIGHT)
         self.speedx = -(self.size * 1.5)
 
@@ -219,14 +200,51 @@ class Star(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# Stage 2: 山 (平坦に変更)
+# ★Stage 2: 平らな地面 (新クラス)
+# ==========================================
+
+
+class FlatGround(pygame.sprite.Sprite):
+    def __init__(self, x, is_top):
+        super().__init__()
+        self.width = 50
+        self.height = 40
+        self.image = pygame.Surface((self.width, self.height))
+        self.image.fill(BROWN)
+        # 地面の継ぎ目が見えるように枠線を描く
+        pygame.draw.rect(self.image, (100, 50, 0),
+                         (0, 0, self.width, self.height), 1)
+
+        # 表面に少し緑のライン（草）を入れる
+        if is_top:
+            pygame.draw.line(self.image, GREEN, (0, self.height-2),
+                             (self.width, self.height-2), 3)
+        else:
+            pygame.draw.line(self.image, GREEN, (0, 0), (self.width, 0), 3)
+
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+
+        if is_top:
+            self.rect.top = 0
+        else:
+            self.rect.bottom = HEIGHT
+
+        self.speedx = -3  # 山と同じ速度
+
+    def update(self):
+        self.rect.x += self.speedx
+        if self.rect.right < 0:
+            self.kill()
+
+# ==========================================
+# Stage 2: 山 (平坦な山)
 # ==========================================
 
 
 class Mountain(pygame.sprite.Sprite):
     def __init__(self, is_top, from_right=True):
         super().__init__()
-        # ★変更点: 幅を広く、高さを低くして平坦な印象に
         width = random.randrange(150, 250)
         height = random.randrange(30, 70)
 
@@ -246,10 +264,12 @@ class Mountain(pygame.sprite.Sprite):
         else:
             self.rect.x = random.randrange(0, WIDTH)
 
+        # 地面とつながる位置に配置
+        ground_height = 40
         if is_top:
-            self.rect.top = 0
+            self.rect.top = ground_height - 10  # 少し重ねる
         else:
-            self.rect.bottom = HEIGHT
+            self.rect.bottom = HEIGHT - ground_height + 10
 
         self.speedx = -3
 

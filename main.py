@@ -2,14 +2,11 @@ import pygame
 import sys
 import random
 from settings import *
-from sprites import Player, Enemy, Bullet, Star, Mountain, Wall, FormationEnemy, TrackingEnemy
+from sprites import Player, Enemy, Bullet, Star, Mountain, Wall, FormationEnemy, TrackingEnemy, FlatGround
 
 HS_FILE = "highscore.txt"
 
-# ステージ切り替えタイミングのオーバーライド (設定ファイルより優先)
-# Stage 2 (惑星) 開始: 20秒
 TIME_STAGE2_START = 20000
-# Stage 3 (要塞) 開始: 60秒 (40-50秒の山イベントを入れるため延長)
 TIME_STAGE3_START = 60000
 
 
@@ -82,17 +79,29 @@ def init_stage_objects(current_time, all_sprites, stars, hazards):
     stars.empty()
     hazards.empty()
 
-    # 宇宙 (Stage 1)
+    # --- Stage 1: 宇宙 ---
     if current_time < TIME_STAGE3_START:
         for i in range(50):
             s = Star(from_right=False)
             all_sprites.add(s)
             stars.add(s)
 
-    # Stage 2 (惑星) の初期配置は「平坦」なので山は配置しない
-    # (時間経過のスクリプトで配置する)
+    # --- Stage 2: 惑星 (地面の初期配置) ---
+    if TIME_STAGE2_START <= current_time < TIME_STAGE3_START:
+        # 画面を埋める分だけ地面を生成
+        num_blocks = WIDTH // 50 + 2
+        for i in range(num_blocks):
+            x_pos = i * 50
+            # 天井
+            g_top = FlatGround(x_pos, is_top=True)
+            all_sprites.add(g_top)
+            hazards.add(g_top)
+            # 地面
+            g_btm = FlatGround(x_pos, is_top=False)
+            all_sprites.add(g_btm)
+            hazards.add(g_btm)
 
-    # Stage 3 (要塞)
+    # --- Stage 3: 要塞 ---
     if current_time >= TIME_STAGE3_START:
         for i in range(5):
             w = Wall(is_top=True, from_right=False)
@@ -144,15 +153,13 @@ def main():
             {'time': 6000, 'type': 'formation', 'pos': 'top'},
             {'time': 8000, 'type': 'formation', 'pos': 'bottom'},
 
-            # --- 後半: 紫の追尾 (12, 14, 16秒 - 3体くの字) ---
-            # 12秒: 上
+            # --- 後半: 紫の追尾 (12, 14, 16秒) ---
             {'time': 12000, 'type': 'tracker', 'exact_y': top_y,     'offset_x': 0},
             {'time': 12000, 'type': 'tracker',
                 'exact_y': top_y - 40, 'offset_x': 40},
             {'time': 12000, 'type': 'tracker',
                 'exact_y': top_y + 40, 'offset_x': 40},
 
-            # 14秒: 下
             {'time': 14000, 'type': 'tracker',
                 'exact_y': bottom_y,     'offset_x': 0},
             {'time': 14000, 'type': 'tracker',
@@ -160,7 +167,6 @@ def main():
             {'time': 14000, 'type': 'tracker',
                 'exact_y': bottom_y + 40, 'offset_x': 40},
 
-            # 16秒: 真ん中
             {'time': 16000, 'type': 'tracker',
                 'exact_y': center_y,     'offset_x': 0},
             {'time': 16000, 'type': 'tracker',
@@ -182,13 +188,34 @@ def main():
             if player.alive():
                 current_time += dt
 
+                # --- 地面の継続生成 (Stage 2) ---
+                if TIME_STAGE2_START <= current_time < TIME_STAGE3_START:
+                    # 地面(hazards)の中で FlatGround だけ抽出して、一番右にあるものを探す
+                    grounds = [h for h in hazards if isinstance(h, FlatGround)]
+
+                    # 画面内に地面がない、または右端が画面に入ってきたら次を追加
+                    rightmost_x = 0
+                    if grounds:
+                        rightmost_x = max([g.rect.right for g in grounds])
+
+                    if rightmost_x < WIDTH + 10:  # 少し余裕を持って生成
+                        # 天井
+                        g_top = FlatGround(
+                            rightmost_x if grounds else WIDTH, is_top=True)
+                        all_sprites.add(g_top)
+                        hazards.add(g_top)
+                        # 地面
+                        g_btm = FlatGround(
+                            rightmost_x if grounds else WIDTH, is_top=False)
+                        all_sprites.add(g_btm)
+                        hazards.add(g_btm)
+
                 # スクリプト実行
                 if len(enemy_script) > 0:
                     while len(enemy_script) > 0 and current_time >= enemy_script[0]['time']:
                         next_spawn = enemy_script[0]
                         enemy_type = next_spawn['type']
 
-                        # --- 青い編隊 ---
                         if enemy_type == 'formation':
                             start_y = 0
                             y_dir = 1
@@ -198,35 +225,28 @@ def main():
                             else:
                                 start_y = HEIGHT * 3 // 4
                                 y_dir = -1
-
                             for i in range(4):
                                 offset = i * 30
                                 fe = FormationEnemy(offset, start_y, y_dir)
                                 all_sprites.add(fe)
                                 mobs.add(fe)
 
-                        # --- 紫の追尾 ---
                         elif enemy_type == 'tracker':
                             start_y = 0
                             offset_x = 0
-
                             if 'exact_y' in next_spawn:
                                 start_y = next_spawn['exact_y']
                             elif next_spawn['pos'] == 'top':
                                 start_y = HEIGHT // 4
                             else:
                                 start_y = HEIGHT * 3 // 4
-
                             if 'offset_x' in next_spawn:
                                 offset_x = next_spawn['offset_x']
-
                             te = TrackingEnemy(start_y, player, offset_x)
                             all_sprites.add(te)
                             mobs.add(te)
 
-                        # --- 山 (地形) ---
                         elif enemy_type == 'mountain':
-                            # 上下の山を同時に出現させる
                             m_top = Mountain(is_top=True, from_right=True)
                             all_sprites.add(m_top)
                             hazards.add(m_top)
@@ -245,16 +265,14 @@ def main():
                     if event.key == pygame.K_SPACE and player.alive():
                         player.shoot()
 
-                # 背景・星の出現 (地形はスクリプト管理になったのでランダム生成は削除)
+                # 背景・星・壁の出現
                 elif event.type == pygame.USEREVENT + 2:
-                    # Stage 1 & 2: 星は出し続ける
                     if current_time < TIME_STAGE3_START:
                         if random.random() < 0.8:
                             s = Star(from_right=True)
                             all_sprites.add(s)
                             stars.add(s)
 
-                    # Stage 3: 壁のランダム生成
                     if current_time >= TIME_STAGE3_START:
                         w_top = Wall(is_top=True, from_right=True)
                         all_sprites.add(w_top)
@@ -295,7 +313,6 @@ def main():
                         mobs.empty()
                         bullets.empty()
 
-                        # リスポーン時の時間巻き戻し処理
                         if current_time >= TIME_STAGE3_START:
                             current_time = TIME_STAGE3_START
                         elif current_time >= TIME_STAGE2_START:
@@ -303,7 +320,6 @@ def main():
                         else:
                             current_time = 0
 
-                        # 通過済みのスクリプトを除去
                         enemy_script = [
                             e for e in base_script if e['time'] > current_time]
 
