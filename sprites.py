@@ -3,7 +3,7 @@ import random
 from settings import *
 
 # ==========================================
-# プレイヤー（自機）クラス
+# プレイヤー
 # ==========================================
 
 
@@ -55,7 +55,7 @@ class Player(pygame.sprite.Sprite):
         self.bullets.add(bullet)
 
 # ==========================================
-# 敵クラス
+# 敵
 # ==========================================
 
 
@@ -65,19 +65,19 @@ class Enemy(pygame.sprite.Sprite):
         self.image = pygame.Surface((30, 30))
         self.image.fill(RED)
         self.rect = self.image.get_rect()
+        # 敵は常に画面右外から出現させる
         self.rect.x = random.randrange(WIDTH + 10, WIDTH + 100)
-        self.rect.y = random.randrange(0, HEIGHT - self.rect.height)
+        self.rect.y = random.randrange(50, HEIGHT - 50)
         self.speedx = random.randrange(ENEMY_SPEED_MIN, ENEMY_SPEED_MAX)
 
     def update(self):
         self.rect.x -= self.speedx
+        # 画面左に消えたら削除してメモリ節約（再利用しない）
         if self.rect.right < 0:
-            self.rect.x = random.randrange(WIDTH + 10, WIDTH + 100)
-            self.rect.y = random.randrange(0, HEIGHT - self.rect.height)
-            self.speedx = random.randrange(ENEMY_SPEED_MIN, ENEMY_SPEED_MAX)
+            self.kill()
 
 # ==========================================
-# 弾クラス
+# 弾
 # ==========================================
 
 
@@ -97,32 +97,102 @@ class Bullet(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# ★背景の星クラス（新規追加）
+# 背景の星
 # ==========================================
 
 
 class Star(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, from_right=False):
         super().__init__()
-        # 星の大きさ（1〜3ピクセル）
         self.size = random.randrange(1, 4)
         self.image = pygame.Surface((self.size, self.size))
-
-        # 明るさをランダムに（真っ白〜少し暗いグレー）
         brightness = random.randrange(100, 255)
         self.image.fill((brightness, brightness, brightness))
-
         self.rect = self.image.get_rect()
-        # 初期位置は画面内のどこか
-        self.rect.x = random.randrange(WIDTH)
-        self.rect.y = random.randrange(HEIGHT)
 
-        # 移動速度（大きい星ほど速く動かす＝遠近感）
+        if from_right:
+            # ゲーム中は右端から生まれる
+            self.rect.x = WIDTH + random.randrange(0, 50)
+        else:
+            # ゲーム開始時は画面全体に散らばる
+            self.rect.x = random.randrange(WIDTH)
+
+        self.rect.y = random.randrange(HEIGHT)
         self.speedx = -(self.size * 1.5)
 
     def update(self):
         self.rect.x += self.speedx
-        # 画面左端に消えたら右端に戻す
         if self.rect.right < 0:
-            self.rect.left = WIDTH
-            self.rect.y = random.randrange(HEIGHT)
+            self.kill()  # 画面外に出たら消す
+
+# ==========================================
+# Stage 2: 山
+# ==========================================
+
+
+class Mountain(pygame.sprite.Sprite):
+    def __init__(self, is_top, from_right=True):
+        super().__init__()
+        width = random.randrange(80, 150)
+        height = random.randrange(50, 120)
+        self.image = pygame.Surface((width, height))
+        self.image.set_colorkey(BLACK)
+
+        points = [(0, height), (width // 2, 0), (width, height)]
+        if is_top:
+            points = [(0, 0), (width // 2, height), (width, 0)]
+
+        pygame.draw.polygon(self.image, BROWN, points)
+
+        self.rect = self.image.get_rect()
+
+        if from_right:
+            self.rect.x = WIDTH + random.randrange(0, 50)
+        else:
+            self.rect.x = random.randrange(0, WIDTH)
+
+        if is_top:
+            self.rect.top = 0
+        else:
+            self.rect.bottom = HEIGHT
+
+        self.speedx = -3  # 背景スクロール速度
+
+    def update(self):
+        self.rect.x += self.speedx
+        if self.rect.right < 0:
+            self.kill()
+
+# ==========================================
+# Stage 3: 壁
+# ==========================================
+
+
+class Wall(pygame.sprite.Sprite):
+    def __init__(self, is_top, from_right=True):
+        super().__init__()
+        width = 100
+        height = 80
+        self.image = pygame.Surface((width, height))
+        self.image.fill(GREY)
+        pygame.draw.rect(self.image, WHITE, (0, 0, width, height), 2)
+        pygame.draw.line(self.image, DARK_GREY, (20, 0), (20, height), 2)
+
+        self.rect = self.image.get_rect()
+
+        if from_right:
+            self.rect.x = WIDTH
+        else:
+            self.rect.x = random.randrange(0, WIDTH)
+
+        if is_top:
+            self.rect.top = 0
+        else:
+            self.rect.bottom = HEIGHT
+
+        self.speedx = -3
+
+    def update(self):
+        self.rect.x += self.speedx
+        if self.rect.right < 0:
+            self.kill()
