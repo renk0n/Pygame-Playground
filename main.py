@@ -2,12 +2,12 @@ import pygame
 import sys
 import random
 from settings import *
-from sprites import Player, Enemy, Bullet, Star, Mountain, Wall, FormationEnemy, TrackingEnemy, FlatGround
+from sprites import Player, Enemy, Bullet, Star, Mountain, Wall, FormationEnemy, TrackingEnemy, FlatGround, CeilingTurret
 
 HS_FILE = "highscore.txt"
 
 TIME_STAGE2_START = 20000
-TIME_STAGE3_START = 60000
+TIME_STAGE3_START = 40000
 
 
 def draw_text(screen, text, size, x, y, color=WHITE):
@@ -88,15 +88,12 @@ def init_stage_objects(current_time, all_sprites, stars, hazards):
 
     # --- Stage 2: 惑星 (地面の初期配置) ---
     if TIME_STAGE2_START <= current_time < TIME_STAGE3_START:
-        # 画面を埋める分だけ地面を生成
         num_blocks = WIDTH // 50 + 2
         for i in range(num_blocks):
             x_pos = i * 50
-            # 天井
             g_top = FlatGround(x_pos, is_top=True)
             all_sprites.add(g_top)
             hazards.add(g_top)
-            # 地面
             g_btm = FlatGround(x_pos, is_top=False)
             all_sprites.add(g_btm)
             hazards.add(g_btm)
@@ -145,15 +142,14 @@ def main():
         bottom_y = HEIGHT * 3 // 4
         center_y = HEIGHT // 2
 
-        # ★イベントスクリプト
         base_script = [
-            # --- 前半: 青い編隊 (2, 4, 6, 8秒) ---
+            # --- Stage 1: 青い編隊 (2, 4, 6, 8秒) ---
             {'time': 2000, 'type': 'formation', 'pos': 'top'},
             {'time': 4000, 'type': 'formation', 'pos': 'bottom'},
             {'time': 6000, 'type': 'formation', 'pos': 'top'},
             {'time': 8000, 'type': 'formation', 'pos': 'bottom'},
 
-            # --- 後半: 紫の追尾 (12, 14, 16秒) ---
+            # --- Stage 1: 紫の追尾 (12, 14, 16秒) ---
             {'time': 12000, 'type': 'tracker', 'exact_y': top_y,     'offset_x': 0},
             {'time': 12000, 'type': 'tracker',
                 'exact_y': top_y - 40, 'offset_x': 40},
@@ -174,10 +170,18 @@ def main():
             {'time': 16000, 'type': 'tracker',
                 'exact_y': center_y + 40, 'offset_x': 40},
 
-            # --- Stage 2 地形イベント: 山 (40, 45, 50秒) ---
-            {'time': 40000, 'type': 'mountain'},
-            {'time': 45000, 'type': 'mountain'},
-            {'time': 50000, 'type': 'mountain'},
+            # --- Stage 2 (20秒〜40秒): 砲台 ---
+            # 22秒: 横に3体
+            {'time': 22000, 'type': 'turret', 'offset_x': 0},
+            {'time': 22000, 'type': 'turret', 'offset_x': 60},
+            {'time': 22000, 'type': 'turret', 'offset_x': 120},
+
+            # 25, 28, 32, 35, 38: 1体ずつ断続的に
+            {'time': 25000, 'type': 'turret', 'offset_x': 0},
+            {'time': 28000, 'type': 'turret', 'offset_x': 0},
+            {'time': 32000, 'type': 'turret', 'offset_x': 0},
+            {'time': 35000, 'type': 'turret', 'offset_x': 0},
+            {'time': 38000, 'type': 'turret', 'offset_x': 0},
         ]
         enemy_script = list(base_script)
 
@@ -187,29 +191,6 @@ def main():
 
             if player.alive():
                 current_time += dt
-
-                # --- 地面の継続生成 (Stage 2) ---
-                if TIME_STAGE2_START <= current_time < TIME_STAGE3_START:
-                    # 地面(hazards)の中で FlatGround だけ抽出して、一番右にあるものを探す
-                    grounds = [h for h in hazards if isinstance(h, FlatGround)]
-
-                    # 画面内に地面がない、または右端が画面に入ってきたら次を追加
-                    rightmost_x = 0
-                    if grounds:
-                        rightmost_x = max([g.rect.right for g in grounds])
-
-                    if rightmost_x < WIDTH + 10:  # 少し余裕を持って生成
-                        # 天井
-                        g_top = FlatGround(
-                            rightmost_x if grounds else WIDTH, is_top=True)
-                        all_sprites.add(g_top)
-                        hazards.add(g_top)
-                        # 地面
-                        g_btm = FlatGround(
-                            rightmost_x if grounds else WIDTH, is_top=False)
-                        all_sprites.add(g_btm)
-                        hazards.add(g_btm)
-
                 # スクリプト実行
                 if len(enemy_script) > 0:
                     while len(enemy_script) > 0 and current_time >= enemy_script[0]['time']:
@@ -254,7 +235,31 @@ def main():
                             all_sprites.add(m_btm)
                             hazards.add(m_btm)
 
+                        elif enemy_type == 'turret':
+                            offset_x = next_spawn.get('offset_x', 0)
+                            turret = CeilingTurret(
+                                WIDTH + offset_x, player, all_sprites, hazards)
+                            all_sprites.add(turret)
+                            mobs.add(turret)
+
                         enemy_script.pop(0)
+
+            # ★ 地面の継続生成処理をプレイヤー生存判定の外に出した (死んでも地面は作られる)
+            if TIME_STAGE2_START <= current_time < TIME_STAGE3_START:
+                grounds = [h for h in hazards if isinstance(h, FlatGround)]
+                rightmost_x = 0
+                if grounds:
+                    rightmost_x = max([g.rect.right for g in grounds])
+
+                if rightmost_x < WIDTH + 10:
+                    g_top = FlatGround(
+                        rightmost_x if grounds else WIDTH, is_top=True)
+                    all_sprites.add(g_top)
+                    hazards.add(g_top)
+                    g_btm = FlatGround(
+                        rightmost_x if grounds else WIDTH, is_top=False)
+                    all_sprites.add(g_btm)
+                    hazards.add(g_btm)
 
             # イベント処理
             for event in pygame.event.get():
@@ -312,13 +317,14 @@ def main():
                     if now - death_time > 2000:
                         mobs.empty()
                         bullets.empty()
+                        hazards.empty()
 
-                        if current_time >= TIME_STAGE3_START:
-                            current_time = TIME_STAGE3_START
-                        elif current_time >= TIME_STAGE2_START:
-                            current_time = TIME_STAGE2_START
+                        if current_time >= 41000:
+                            current_time = 41000
+                        elif current_time >= 21000:
+                            current_time = 21000
                         else:
-                            current_time = 0
+                            current_time = 1000
 
                         enemy_script = [
                             e for e in base_script if e['time'] > current_time]

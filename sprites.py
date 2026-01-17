@@ -155,7 +155,79 @@ class TrackingEnemy(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# 弾
+# 固定砲台 (天井)
+# ==========================================
+
+
+class CeilingTurret(pygame.sprite.Sprite):
+    def __init__(self, x, player, all_sprites, hazards):
+        super().__init__()
+        self.image = pygame.Surface((30, 30))
+        self.image.fill(RED)
+        pygame.draw.rect(self.image, (200, 0, 0), (10, 15, 10, 15))
+
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.top = 40
+
+        self.player = player
+        self.all_sprites = all_sprites
+        self.hazards = hazards
+
+        self.last_shot = pygame.time.get_ticks()
+        self.shoot_delay = 1500
+        self.speedx = -3
+
+    def update(self):
+        self.rect.x += self.speedx
+
+        if -50 < self.rect.centerx < WIDTH + 50:
+            now = pygame.time.get_ticks()
+            if now - self.last_shot > self.shoot_delay:
+                self.shoot()
+                self.last_shot = now
+
+        if self.rect.right < 0:
+            self.kill()
+
+    def shoot(self):
+        laser = EnemyLaser(self.rect.centerx, self.rect.bottom, self.player)
+        self.all_sprites.add(laser)
+        self.hazards.add(laser)
+
+# ==========================================
+# ★敵の弾 (レーザー)
+# ==========================================
+
+
+class EnemyLaser(pygame.sprite.Sprite):
+    def __init__(self, x, y, player):
+        super().__init__()
+        self.image = pygame.Surface((10, 10))
+        self.image.fill(YELLOW)
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+
+        # ★速度を少しゆっくりに (7 -> 4)
+        speed = 4
+
+        dx = player.rect.centerx - x
+        dy = player.rect.centery - y
+        angle = math.atan2(dy, dx)
+
+        self.vx = math.cos(angle) * speed
+        self.vy = math.sin(angle) * speed
+
+    def update(self):
+        self.rect.x += self.vx
+        self.rect.y += self.vy
+
+        if (self.rect.right < 0 or self.rect.left > WIDTH or
+                self.rect.bottom < 0 or self.rect.top > HEIGHT):
+            self.kill()
+
+# ==========================================
+# プレイヤーの弾
 # ==========================================
 
 
@@ -200,7 +272,7 @@ class Star(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# ★Stage 2: 平らな地面 (新クラス)
+# Stage 2: 平らな地面
 # ==========================================
 
 
@@ -211,11 +283,9 @@ class FlatGround(pygame.sprite.Sprite):
         self.height = 40
         self.image = pygame.Surface((self.width, self.height))
         self.image.fill(BROWN)
-        # 地面の継ぎ目が見えるように枠線を描く
         pygame.draw.rect(self.image, (100, 50, 0),
                          (0, 0, self.width, self.height), 1)
 
-        # 表面に少し緑のライン（草）を入れる
         if is_top:
             pygame.draw.line(self.image, GREEN, (0, self.height-2),
                              (self.width, self.height-2), 3)
@@ -230,7 +300,7 @@ class FlatGround(pygame.sprite.Sprite):
         else:
             self.rect.bottom = HEIGHT
 
-        self.speedx = -3  # 山と同じ速度
+        self.speedx = -3
 
     def update(self):
         self.rect.x += self.speedx
@@ -238,7 +308,7 @@ class FlatGround(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# Stage 2: 山 (平坦な山)
+# Stage 2: 山
 # ==========================================
 
 
@@ -264,10 +334,9 @@ class Mountain(pygame.sprite.Sprite):
         else:
             self.rect.x = random.randrange(0, WIDTH)
 
-        # 地面とつながる位置に配置
         ground_height = 40
         if is_top:
-            self.rect.top = ground_height - 10  # 少し重ねる
+            self.rect.top = ground_height - 10
         else:
             self.rect.bottom = HEIGHT - ground_height + 10
 
