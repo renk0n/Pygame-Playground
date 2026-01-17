@@ -2,7 +2,7 @@ import pygame
 import sys
 import random
 from settings import *
-from sprites import Player, Enemy, Bullet, Star, Mountain, Wall, FormationEnemy
+from sprites import Player, Enemy, Bullet, Star, Mountain, Wall, FormationEnemy, TrackingEnemy
 
 HS_FILE = "highscore.txt"
 
@@ -70,22 +70,18 @@ def show_start_screen(screen, high_score):
                 if event.key == pygame.K_RETURN:
                     return selected_index
 
-# 初期化用関数
-
 
 def init_stage_objects(current_time, all_sprites, stars, hazards):
     all_sprites.empty()
     stars.empty()
     hazards.empty()
 
-    # Stage 1〜2エリア
     if current_time < TIME_STAGE3:
         for i in range(50):
             s = Star(from_right=False)
             all_sprites.add(s)
             stars.add(s)
 
-    # Stage 2エリア
     if TIME_STAGE2 <= current_time < TIME_STAGE3:
         for i in range(3):
             m = Mountain(is_top=True, from_right=False)
@@ -95,7 +91,6 @@ def init_stage_objects(current_time, all_sprites, stars, hazards):
             all_sprites.add(m)
             hazards.add(m)
 
-    # Stage 3エリア
     if current_time >= TIME_STAGE3:
         for i in range(5):
             w = Wall(is_top=True, from_right=False)
@@ -133,17 +128,43 @@ def main():
         init_stage_objects(current_time, all_sprites, stars, hazards)
         all_sprites.add(player)
 
-        # 地形生成タイマー
         pygame.time.set_timer(pygame.USEREVENT + 2, 800)
 
-        # 敵の出現スケジュール
-        # 上, 下, 上, 下, 上
+        top_y = HEIGHT // 4
+        bottom_y = HEIGHT * 3 // 4
+        center_y = HEIGHT // 2
+
+        # ★敵の出現スケジュール (青い編隊 + 紫の追尾)
         base_script = [
-            {'time': 2000, 'pos': 'top'},
-            {'time': 4000, 'pos': 'bottom'},
-            {'time': 6000, 'pos': 'top'},
-            {'time': 8000, 'pos': 'bottom'},
-            {'time': 10000, 'pos': 'top'}
+            # --- 前半: 青い編隊 (2, 4, 6, 8秒) ---
+            {'time': 2000, 'type': 'formation', 'pos': 'top'},
+            {'time': 4000, 'type': 'formation', 'pos': 'bottom'},
+            {'time': 6000, 'type': 'formation', 'pos': 'top'},
+            {'time': 8000, 'type': 'formation', 'pos': 'bottom'},
+
+            # --- 後半: 紫の追尾 (12, 14, 16秒 - 3体くの字) ---
+            # 12秒: 上
+            {'time': 12000, 'type': 'tracker', 'exact_y': top_y,     'offset_x': 0},
+            {'time': 12000, 'type': 'tracker',
+                'exact_y': top_y - 40, 'offset_x': 40},
+            {'time': 12000, 'type': 'tracker',
+                'exact_y': top_y + 40, 'offset_x': 40},
+
+            # 14秒: 下
+            {'time': 14000, 'type': 'tracker',
+                'exact_y': bottom_y,     'offset_x': 0},
+            {'time': 14000, 'type': 'tracker',
+                'exact_y': bottom_y - 40, 'offset_x': 40},
+            {'time': 14000, 'type': 'tracker',
+                'exact_y': bottom_y + 40, 'offset_x': 40},
+
+            # 16秒: 真ん中
+            {'time': 16000, 'type': 'tracker',
+                'exact_y': center_y,     'offset_x': 0},
+            {'time': 16000, 'type': 'tracker',
+                'exact_y': center_y - 40, 'offset_x': 40},
+            {'time': 16000, 'type': 'tracker',
+                'exact_y': center_y + 40, 'offset_x': 40},
         ]
         enemy_script = list(base_script)
 
@@ -156,27 +177,45 @@ def main():
 
                 # スクリプトに基づく敵出現処理
                 if len(enemy_script) > 0:
-                    next_spawn = enemy_script[0]
-                    if current_time >= next_spawn['time']:
-                        pos_key = next_spawn['pos']
+                    while len(enemy_script) > 0 and current_time >= enemy_script[0]['time']:
+                        next_spawn = enemy_script[0]
+                        enemy_type = next_spawn['type']
 
-                        start_y = 0
-                        y_dir = 1  # デフォルトは下へ(top出現時)
-
-                        if pos_key == 'top':
-                            start_y = HEIGHT // 4
+                        # --- 青い編隊 (Formation) ---
+                        if enemy_type == 'formation':
+                            start_y = 0
                             y_dir = 1
-                        else:
-                            start_y = HEIGHT * 3 // 4
-                            y_dir = -1  # 下から出る時は上へ戻る
+                            if next_spawn['pos'] == 'top':
+                                start_y = HEIGHT // 4
+                                y_dir = 1
+                            else:
+                                start_y = HEIGHT * 3 // 4
+                                y_dir = -1
 
-                        # 4体編隊を生成
-                        for i in range(4):
-                            # 間隔を30pxに狭めて「1111」のように連ならせる
-                            offset = i * 30
-                            fe = FormationEnemy(offset, start_y, y_dir)
-                            all_sprites.add(fe)
-                            mobs.add(fe)
+                            for i in range(4):
+                                offset = i * 30
+                                fe = FormationEnemy(offset, start_y, y_dir)
+                                all_sprites.add(fe)
+                                mobs.add(fe)
+
+                        # --- 紫の追尾 (Tracker) ---
+                        elif enemy_type == 'tracker':
+                            start_y = 0
+                            offset_x = 0
+
+                            if 'exact_y' in next_spawn:
+                                start_y = next_spawn['exact_y']
+                            elif next_spawn['pos'] == 'top':
+                                start_y = HEIGHT // 4
+                            else:
+                                start_y = HEIGHT * 3 // 4
+
+                            if 'offset_x' in next_spawn:
+                                offset_x = next_spawn['offset_x']
+
+                            te = TrackingEnemy(start_y, player, offset_x)
+                            all_sprites.add(te)
+                            mobs.add(te)
 
                         enemy_script.pop(0)
 
@@ -243,7 +282,6 @@ def main():
                                   WIDTH // 2, HEIGHT - 100, RED)
                 else:
                     if now - death_time > 2000:
-                        # チェックポイント復活
                         mobs.empty()
                         bullets.empty()
 

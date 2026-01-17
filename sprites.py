@@ -76,7 +76,7 @@ class Enemy(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# ★編隊を組む敵 (玉)
+# 編隊を組む敵 (青い玉)
 # ==========================================
 
 
@@ -90,7 +90,6 @@ class FormationEnemy(pygame.sprite.Sprite):
                            (self.radius, self.radius), self.radius)
         self.rect = self.image.get_rect()
 
-        # スタート位置
         self.rect.x = WIDTH + offset_x
         self.rect.y = start_y
 
@@ -100,10 +99,9 @@ class FormationEnemy(pygame.sprite.Sprite):
         self.y_direction = y_direction
 
     def update(self):
-        # State 0: 左へ進む
+        # State 0: 左へ
         if self.state == 0:
             self.rect.x -= self.speed
-            # 画面中央より少し奥で折り返し
             if self.rect.centerx < (WIDTH // 2) - 100:
                 self.state = 1
                 self.turn_timer = pygame.time.get_ticks()
@@ -120,17 +118,58 @@ class FormationEnemy(pygame.sprite.Sprite):
         elif self.state == 2:
             self.rect.x += self.speed
 
-        # --- 修正箇所: 画面外判定のロジック変更 ---
-        # 「右へ帰っていく時(state 2)」だけ、画面右外に出たら消す
-        # そうしないと、登場時(state 0)に画面右外にいる後続の敵が消されてしまう
+        # 画面外判定
         if self.state == 2 and self.rect.left > WIDTH:
             self.kill()
-
-        # 上下の画面外判定はいつでも有効
         elif self.rect.top > HEIGHT or self.rect.bottom < 0:
             self.kill()
 
-        # (左端の判定は入れていませんが、この敵は左へ抜け切ることはないので不要です)
+# ==========================================
+# ★追尾する敵 (紫の三角)
+# ==========================================
+
+
+class TrackingEnemy(pygame.sprite.Sprite):
+    def __init__(self, start_y, player, offset_x=0):
+        super().__init__()
+        self.player = player
+
+        size = 30
+        self.image = pygame.Surface((size, size), pygame.SRCALPHA)
+        points = [(0, size // 2), (size, 0), (size, size)]
+        pygame.draw.polygon(self.image, (255, 0, 255), points)
+
+        self.rect = self.image.get_rect()
+        self.rect.x = WIDTH + offset_x
+        self.rect.y = start_y
+
+        # 速度設定
+        self.dash_speed = 6   # 直進時の速さ
+        self.creep_speed = 3  # 斜め移動時の速さ（ゆっくり）
+
+    def update(self):
+        dy = self.player.rect.centery - self.rect.centery
+        threshold = 5
+
+        # 斜め移動（位置合わせ）はゆっくり
+        # 直線移動（攻撃）は速く
+
+        if dy < -threshold:
+            # 斜め左上 (45度) - ゆっくり
+            self.rect.x -= self.creep_speed * 0.7
+            self.rect.y -= self.creep_speed * 0.7
+        elif dy > threshold:
+            # 斜め左下 (45度) - ゆっくり
+            self.rect.x -= self.creep_speed * 0.7
+            self.rect.y += self.creep_speed * 0.7
+        else:
+            # 直進 - 速い！
+            self.rect.x -= self.dash_speed
+
+        if self.rect.right < 0:
+            self.kill()
+        if self.rect.bottom < 0 or self.rect.top > HEIGHT:
+            self.kill()
 
 # ==========================================
 # 弾
