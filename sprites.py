@@ -196,7 +196,7 @@ class CeilingTurret(pygame.sprite.Sprite):
         self.hazards.add(laser)
 
 # ==========================================
-# ★敵の弾 (レーザー)
+# 敵の弾 (レーザー)
 # ==========================================
 
 
@@ -208,7 +208,6 @@ class EnemyLaser(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
 
-        # ★速度を少しゆっくりに (7 -> 4)
         speed = 4
 
         dx = player.rect.centerx - x
@@ -380,3 +379,91 @@ class Wall(pygame.sprite.Sprite):
         self.rect.x += self.speedx
         if self.rect.right < 0:
             self.kill()
+
+# ==========================================
+# ★ホッピングする敵 (AI強化版)
+# ==========================================
+
+
+class HoppingEnemy(pygame.sprite.Sprite):
+    def __init__(self, x, player, all_sprites, hazards):
+        super().__init__()
+        self.image = pygame.Surface((30, 30))
+        self.image.fill((0, 255, 255))
+        self.rect = self.image.get_rect()
+
+        self.ground_y = HEIGHT - 40
+        self.rect.x = x
+        self.rect.bottom = self.ground_y
+
+        self.player = player
+        self.all_sprites = all_sprites
+        self.hazards = hazards
+
+        self.vy = 0
+        self.gravity = 0.8
+        self.jump_power = -12
+
+        self.last_shot = pygame.time.get_ticks()
+        self.shoot_delay = random.randrange(1500, 2500)
+
+        self.scroll_speed = -3   # 背景スクロール速度
+        self.move_speed = 3.5    # 敵自身の移動速度
+        self.vx = self.scroll_speed  # 初期速度
+
+    def update(self):
+        # 縦移動 (重力)
+        self.vy += self.gravity
+        self.rect.y += self.vy
+
+        # 横移動 (現在の速度)
+        self.rect.x += self.vx
+
+        # 着地判定
+        if self.rect.bottom >= self.ground_y:
+            self.rect.bottom = self.ground_y
+            self.vy = self.jump_power  # ジャンプ！
+
+            # ★ AIロジック: 次のジャンプの方向を決める
+
+            # プレイヤーとの距離
+            dist_x = self.player.rect.centerx - self.rect.centerx
+
+            # プレイヤーの近く (±40px以内) にいる場合 -> 左右交互に跳ねる (またぐ)
+            if abs(dist_x) < 40:
+                # 現在の相対速度を計算 (vx - スクロール速度)
+                # 正なら右に動いている、負なら左に動いている
+                current_rel_speed = self.vx - self.scroll_speed
+
+                if current_rel_speed > 0:
+                    # 今 右向きなら -> 次は左へ (スクロール - 移動速度)
+                    self.vx = self.scroll_speed - self.move_speed
+                else:
+                    # 今 左向きなら -> 次は右へ (スクロール + 移動速度)
+                    self.vx = self.scroll_speed + self.move_speed
+
+            # プレイヤーが遠くにいる場合 -> プレイヤーの方へ近づく
+            else:
+                if dist_x > 0:  # プレイヤーは右にいる
+                    self.vx = self.scroll_speed + self.move_speed
+                else:  # プレイヤーは左にいる
+                    self.vx = self.scroll_speed - self.move_speed
+
+        # 画面外
+        if self.rect.right < -100 or self.rect.left > WIDTH + 100:
+            # 少し余裕を持って消す
+            if self.rect.right < -100:
+                self.kill()
+
+        # 射撃処理
+        if 0 < self.rect.centerx < WIDTH:
+            now = pygame.time.get_ticks()
+            if now - self.last_shot > self.shoot_delay:
+                self.shoot()
+                self.last_shot = now
+                self.shoot_delay = random.randrange(1500, 2500)
+
+    def shoot(self):
+        laser = EnemyLaser(self.rect.centerx, self.rect.top, self.player)
+        self.all_sprites.add(laser)
+        self.hazards.add(laser)

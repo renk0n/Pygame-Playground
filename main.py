@@ -2,7 +2,8 @@ import pygame
 import sys
 import random
 from settings import *
-from sprites import Player, Enemy, Bullet, Star, Mountain, Wall, FormationEnemy, TrackingEnemy, FlatGround, CeilingTurret
+# SpritesからHoppingEnemyもインポート
+from sprites import Player, Enemy, Bullet, Star, Mountain, Wall, FormationEnemy, TrackingEnemy, FlatGround, CeilingTurret, HoppingEnemy
 
 HS_FILE = "highscore.txt"
 
@@ -170,17 +171,42 @@ def main():
             {'time': 16000, 'type': 'tracker',
                 'exact_y': center_y + 40, 'offset_x': 40},
 
-            # --- Stage 2 (20秒〜40秒): 砲台 ---
-            # 22秒: 横に3体
+            # --- Stage 2 (20秒〜40秒): 砲台(turret) と ホッパー(hopper) ---
+
+            # 22秒: 砲台3連
             {'time': 22000, 'type': 'turret', 'offset_x': 0},
             {'time': 22000, 'type': 'turret', 'offset_x': 60},
             {'time': 22000, 'type': 'turret', 'offset_x': 120},
 
-            # 25, 28, 32, 35, 38: 1体ずつ断続的に
+            # ★ 23秒: ホッパー
+            {'time': 23000, 'type': 'hopper', 'offset_x': 0},
+
+            # 25秒: 砲台
             {'time': 25000, 'type': 'turret', 'offset_x': 0},
+
+            # ★ 26秒: ホッパー
+            {'time': 26500, 'type': 'hopper', 'offset_x': 0},
+
+            # 28秒: 砲台
             {'time': 28000, 'type': 'turret', 'offset_x': 0},
+
+            # ★ 30秒: ホッパー2体
+            {'time': 30000, 'type': 'hopper', 'offset_x': 0},
+            {'time': 30000, 'type': 'hopper', 'offset_x': 100},
+
+            # 32秒: 砲台
             {'time': 32000, 'type': 'turret', 'offset_x': 0},
+
+            # ★ 34秒: ホッパー
+            {'time': 34000, 'type': 'hopper', 'offset_x': 0},
+
+            # 35秒: 砲台
             {'time': 35000, 'type': 'turret', 'offset_x': 0},
+
+            # ★ 37秒: ホッパー
+            {'time': 37000, 'type': 'hopper', 'offset_x': 0},
+
+            # 38秒: 砲台
             {'time': 38000, 'type': 'turret', 'offset_x': 0},
         ]
         enemy_script = list(base_script)
@@ -242,9 +268,17 @@ def main():
                             all_sprites.add(turret)
                             mobs.add(turret)
 
+                        # ★ホッパーの出現処理
+                        elif enemy_type == 'hopper':
+                            offset_x = next_spawn.get('offset_x', 0)
+                            hopper = HoppingEnemy(
+                                WIDTH + offset_x, player, all_sprites, hazards)
+                            all_sprites.add(hopper)
+                            mobs.add(hopper)
+
                         enemy_script.pop(0)
 
-            # ★ 地面の継続生成処理をプレイヤー生存判定の外に出した (死んでも地面は作られる)
+            # 地面の継続生成処理
             if TIME_STAGE2_START <= current_time < TIME_STAGE3_START:
                 grounds = [h for h in hazards if isinstance(h, FlatGround)]
                 rightmost_x = 0
