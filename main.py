@@ -2,8 +2,7 @@ import pygame
 import sys
 import random
 from settings import *
-# SpritesからHoppingEnemyもインポート
-from sprites import Player, Enemy, Bullet, Star, Mountain, Wall, FormationEnemy, TrackingEnemy, FlatGround, CeilingTurret, HoppingEnemy
+from sprites import Player, Enemy, Bullet, Star, Mountain, Wall, FormationEnemy, TrackingEnemy, FlatGround, CeilingTurret, HoppingEnemy, WaveEnemy
 
 HS_FILE = "highscore.txt"
 
@@ -150,6 +149,12 @@ def main():
             {'time': 6000, 'type': 'formation', 'pos': 'top'},
             {'time': 8000, 'type': 'formation', 'pos': 'bottom'},
 
+            # ★ Stage 1: ウェーブ飛行機 (上下交互)
+            {'time': 10000, 'type': 'wave', 'base_y': top_y},    # 上
+            {'time': 10500, 'type': 'wave', 'base_y': bottom_y},  # 下
+            {'time': 11000, 'type': 'wave', 'base_y': top_y},    # 上
+            {'time': 11500, 'type': 'wave', 'base_y': bottom_y},  # 下
+
             # --- Stage 1: 紫の追尾 (12, 14, 16秒) ---
             {'time': 12000, 'type': 'tracker', 'exact_y': top_y,     'offset_x': 0},
             {'time': 12000, 'type': 'tracker',
@@ -171,39 +176,45 @@ def main():
             {'time': 16000, 'type': 'tracker',
                 'exact_y': center_y + 40, 'offset_x': 40},
 
-            # --- Stage 2 (20秒〜40秒): 砲台(turret) と ホッパー(hopper) ---
+            # --- Stage 2 (20秒〜40秒): 砲台, ホッパー, ウェーブ ---
 
             # 22秒: 砲台3連
             {'time': 22000, 'type': 'turret', 'offset_x': 0},
             {'time': 22000, 'type': 'turret', 'offset_x': 60},
             {'time': 22000, 'type': 'turret', 'offset_x': 120},
 
-            # ★ 23秒: ホッパー
+            # 23秒: ホッパー
             {'time': 23000, 'type': 'hopper', 'offset_x': 0},
 
             # 25秒: 砲台
             {'time': 25000, 'type': 'turret', 'offset_x': 0},
 
-            # ★ 26秒: ホッパー
+            # 26.5秒: ホッパー
             {'time': 26500, 'type': 'hopper', 'offset_x': 0},
 
             # 28秒: 砲台
             {'time': 28000, 'type': 'turret', 'offset_x': 0},
 
-            # ★ 30秒: ホッパー2体
+            # ★ Stage 2: ウェーブ飛行機 (上下交互)
+            {'time': 29000, 'type': 'wave', 'base_y': top_y},    # 上
+            {'time': 29500, 'type': 'wave', 'base_y': bottom_y},  # 下
+            {'time': 30000, 'type': 'wave', 'base_y': top_y},    # 上
+            {'time': 30500, 'type': 'wave', 'base_y': bottom_y},  # 下
+
+            # 30秒: ホッパー2体
             {'time': 30000, 'type': 'hopper', 'offset_x': 0},
             {'time': 30000, 'type': 'hopper', 'offset_x': 100},
 
             # 32秒: 砲台
             {'time': 32000, 'type': 'turret', 'offset_x': 0},
 
-            # ★ 34秒: ホッパー
+            # 34秒: ホッパー
             {'time': 34000, 'type': 'hopper', 'offset_x': 0},
 
             # 35秒: 砲台
             {'time': 35000, 'type': 'turret', 'offset_x': 0},
 
-            # ★ 37秒: ホッパー
+            # 37秒: ホッパー
             {'time': 37000, 'type': 'hopper', 'offset_x': 0},
 
             # 38秒: 砲台
@@ -268,13 +279,18 @@ def main():
                             all_sprites.add(turret)
                             mobs.add(turret)
 
-                        # ★ホッパーの出現処理
                         elif enemy_type == 'hopper':
                             offset_x = next_spawn.get('offset_x', 0)
                             hopper = HoppingEnemy(
                                 WIDTH + offset_x, player, all_sprites, hazards)
                             all_sprites.add(hopper)
                             mobs.add(hopper)
+
+                        elif enemy_type == 'wave':
+                            base_y = next_spawn.get('base_y', HEIGHT // 2)
+                            we = WaveEnemy(0, base_y)
+                            all_sprites.add(we)
+                            mobs.add(we)
 
                         enemy_script.pop(0)
 

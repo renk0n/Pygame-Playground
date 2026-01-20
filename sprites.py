@@ -381,7 +381,7 @@ class Wall(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# ★ホッピングする敵 (AI強化版)
+# ホッピングする敵 (AI強化版)
 # ==========================================
 
 
@@ -412,50 +412,36 @@ class HoppingEnemy(pygame.sprite.Sprite):
         self.vx = self.scroll_speed  # 初期速度
 
     def update(self):
-        # 縦移動 (重力)
         self.vy += self.gravity
         self.rect.y += self.vy
 
-        # 横移動 (現在の速度)
         self.rect.x += self.vx
 
         # 着地判定
         if self.rect.bottom >= self.ground_y:
             self.rect.bottom = self.ground_y
-            self.vy = self.jump_power  # ジャンプ！
+            self.vy = self.jump_power
 
-            # ★ AIロジック: 次のジャンプの方向を決める
-
-            # プレイヤーとの距離
+            # AI: プレイヤーの位置に応じて動きを変える
             dist_x = self.player.rect.centerx - self.rect.centerx
-
-            # プレイヤーの近く (±40px以内) にいる場合 -> 左右交互に跳ねる (またぐ)
             if abs(dist_x) < 40:
-                # 現在の相対速度を計算 (vx - スクロール速度)
-                # 正なら右に動いている、負なら左に動いている
+                # またぐ動き
                 current_rel_speed = self.vx - self.scroll_speed
-
                 if current_rel_speed > 0:
-                    # 今 右向きなら -> 次は左へ (スクロール - 移動速度)
                     self.vx = self.scroll_speed - self.move_speed
                 else:
-                    # 今 左向きなら -> 次は右へ (スクロール + 移動速度)
                     self.vx = self.scroll_speed + self.move_speed
-
-            # プレイヤーが遠くにいる場合 -> プレイヤーの方へ近づく
             else:
-                if dist_x > 0:  # プレイヤーは右にいる
+                # 接近
+                if dist_x > 0:
                     self.vx = self.scroll_speed + self.move_speed
-                else:  # プレイヤーは左にいる
+                else:
                     self.vx = self.scroll_speed - self.move_speed
 
-        # 画面外
         if self.rect.right < -100 or self.rect.left > WIDTH + 100:
-            # 少し余裕を持って消す
             if self.rect.right < -100:
                 self.kill()
 
-        # 射撃処理
         if 0 < self.rect.centerx < WIDTH:
             now = pygame.time.get_ticks()
             if now - self.last_shot > self.shoot_delay:
@@ -467,3 +453,37 @@ class HoppingEnemy(pygame.sprite.Sprite):
         laser = EnemyLaser(self.rect.centerx, self.rect.top, self.player)
         self.all_sprites.add(laser)
         self.hazards.add(laser)
+
+# ==========================================
+# ★波線で進む飛行機
+# ==========================================
+
+
+class WaveEnemy(pygame.sprite.Sprite):
+    def __init__(self, offset_x, start_y):
+        super().__init__()
+        # オレンジ色の三角形
+        self.image = pygame.Surface((40, 30), pygame.SRCALPHA)
+        points = [(0, 15), (40, 0), (40, 30)]  # 左向きの三角
+        pygame.draw.polygon(self.image, (255, 165, 0), points)  # Orange
+
+        self.rect = self.image.get_rect()
+        self.rect.x = WIDTH + offset_x
+
+        self.base_y = start_y  # 基準となるY座標
+        self.rect.centery = start_y
+
+        self.speed = 5
+        self.theta = 0  # 角度
+        self.amplitude = 80  # 振幅 (波の大きさ)
+        self.frequency = 0.05  # 周波数 (波の細かさ)
+
+    def update(self):
+        self.rect.x -= self.speed
+
+        # サイン波でY座標を計算
+        self.theta += self.frequency
+        self.rect.centery = self.base_y + math.sin(self.theta) * self.amplitude
+
+        if self.rect.right < 0:
+            self.kill()
