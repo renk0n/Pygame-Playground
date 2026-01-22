@@ -1,19 +1,15 @@
 import pygame
 import sys
 import random
-import math  # mathが必要なので確認
+import math
 from settings import *
-# SpritesにBossを追加インポート
 from sprites import Player, Enemy, Bullet, Star, Mountain, Wall, FormationEnemy, TrackingEnemy, FlatGround, CeilingTurret, HoppingEnemy, WaveEnemy, EnemyTower, TowerEnemy, Boss
 
 HS_FILE = "highscore.txt"
 
 TIME_STAGE2_START = 20000
 TIME_STAGE3_START = 40000
-TIME_BOSS_START = 60000   # ★ボス出現時間
-
-# (draw_text, load_high_score, save_high_score, show_start_screen, init_stage_objects は変更なし)
-# そのまま残してください。
+TIME_BOSS_START = 60000
 
 
 def draw_text(screen, text, size, x, y, color=WHITE):
@@ -39,7 +35,6 @@ def save_high_score(score):
 
 
 def show_start_screen(screen, high_score):
-    # (変更なし)
     selected_index = 0
     waiting = True
     while waiting:
@@ -82,15 +77,18 @@ def show_start_screen(screen, high_score):
 
 
 def init_stage_objects(current_time, all_sprites, stars, hazards):
-    # (変更なし)
     all_sprites.empty()
     stars.empty()
     hazards.empty()
+
+    # --- Stage 1: 宇宙 ---
     if current_time < TIME_STAGE3_START:
         for i in range(50):
             s = Star(from_right=False)
             all_sprites.add(s)
             stars.add(s)
+
+    # --- Stage 2: 惑星 ---
     if TIME_STAGE2_START <= current_time < TIME_STAGE3_START:
         num_blocks = WIDTH // 50 + 2
         for i in range(num_blocks):
@@ -101,6 +99,8 @@ def init_stage_objects(current_time, all_sprites, stars, hazards):
             g_btm = FlatGround(x_pos, is_top=False)
             all_sprites.add(g_btm)
             hazards.add(g_btm)
+
+    # --- Stage 3: 要塞 ---
     if current_time >= TIME_STAGE3_START and current_time < TIME_BOSS_START:
         for i in range(5):
             w = Wall(is_top=True, from_right=False)
@@ -134,7 +134,7 @@ def main():
         lives = 2
         death_time = 0
         current_time = 0
-        mission_complete = False  # ★クリアフラグ
+        mission_complete = False
         complete_time = 0
 
         init_stage_objects(current_time, all_sprites, stars, hazards)
@@ -147,7 +147,7 @@ def main():
         center_y = HEIGHT // 2
 
         base_script = [
-            # --- Stage 1 ---
+            # --- Stage 1: Space (0-20s) ---
             {'time': 2000, 'type': 'formation', 'pos': 'top'},
             {'time': 4000, 'type': 'formation', 'pos': 'bottom'},
             {'time': 6000, 'type': 'formation', 'pos': 'top'},
@@ -174,7 +174,13 @@ def main():
             {'time': 16000, 'type': 'tracker',
                 'exact_y': center_y + 40, 'offset_x': 40},
 
-            # --- Stage 2 ---
+            # ★追加: Stage 1 最後の隙間に編隊
+            {'time': 18000, 'type': 'formation', 'pos': 'top'},
+
+            # --- Stage 2: Planet (20-40s) ---
+            # ★追加: Stage 2 開幕の隙間にウェーブ
+            {'time': 21000, 'type': 'wave', 'base_y': center_y},
+
             {'time': 22000, 'type': 'turret', 'offset_x': 0},
             {'time': 22000, 'type': 'turret', 'offset_x': 60},
             {'time': 22000, 'type': 'turret', 'offset_x': 120},
@@ -189,18 +195,32 @@ def main():
             {'time': 30000, 'type': 'hopper', 'offset_x': 0},
             {'time': 30000, 'type': 'hopper', 'offset_x': 100},
             {'time': 32000, 'type': 'turret', 'offset_x': 0},
+
+            # ★追加: Stage 2 中盤に編隊
+            {'time': 33000, 'type': 'formation', 'pos': 'bottom'},
+
             {'time': 34000, 'type': 'hopper', 'offset_x': 0},
             {'time': 35000, 'type': 'turret', 'offset_x': 0},
+
+            # ★追加: Stage 2 後半にウェーブ
+            {'time': 36000, 'type': 'wave', 'base_y': top_y},
+
             {'time': 37000, 'type': 'hopper', 'offset_x': 0},
             {'time': 38000, 'type': 'turret', 'offset_x': 0},
 
-            # --- Stage 3: 要塞 ---
+            # --- Stage 3: Base (40-60s) ---
             {'time': 42000, 'type': 'tower', 'offset_x': 0},
             {'time': 45000, 'type': 'tower', 'offset_x': 0},
             {'time': 48000, 'type': 'tower', 'offset_x': 0},
             {'time': 48000, 'type': 'tower', 'offset_x': 150},
 
-            # ★ 60秒: BOSS出現
+            # ★追加: ボス前の隙間埋め (追尾 & タワー)
+            {'time': 50000, 'type': 'tracker', 'exact_y': top_y, 'offset_x': 0},
+            {'time': 52000, 'type': 'tower', 'offset_x': 0},
+            {'time': 53000, 'type': 'tracker', 'exact_y': bottom_y, 'offset_x': 0},
+            {'time': 56000, 'type': 'tracker', 'exact_y': center_y, 'offset_x': 0},
+
+            # ★ BOSS
             {'time': 60000, 'type': 'boss'},
         ]
         enemy_script = list(base_script)
@@ -216,7 +236,6 @@ def main():
                         next_spawn = enemy_script[0]
                         enemy_type = next_spawn['type']
 
-                        # (既存の敵生成ロジック)
                         if enemy_type == 'formation':
                             start_y = 0
                             y_dir = 1
@@ -231,6 +250,7 @@ def main():
                                 fe = FormationEnemy(offset, start_y, y_dir)
                                 all_sprites.add(fe)
                                 mobs.add(fe)
+
                         elif enemy_type == 'tracker':
                             start_y = 0
                             offset_x = 0
@@ -245,23 +265,27 @@ def main():
                             te = TrackingEnemy(start_y, player, offset_x)
                             all_sprites.add(te)
                             mobs.add(te)
+
                         elif enemy_type == 'turret':
                             offset_x = next_spawn.get('offset_x', 0)
                             turret = CeilingTurret(
                                 WIDTH + offset_x, player, all_sprites, hazards)
                             all_sprites.add(turret)
                             mobs.add(turret)
+
                         elif enemy_type == 'hopper':
                             offset_x = next_spawn.get('offset_x', 0)
                             hopper = HoppingEnemy(
                                 WIDTH + offset_x, player, all_sprites, hazards)
                             all_sprites.add(hopper)
                             mobs.add(hopper)
+
                         elif enemy_type == 'wave':
                             base_y = next_spawn.get('base_y', HEIGHT // 2)
                             we = WaveEnemy(0, base_y)
                             all_sprites.add(we)
                             mobs.add(we)
+
                         elif enemy_type == 'tower':
                             offset_x = next_spawn.get('offset_x', 0)
                             tower = EnemyTower(
@@ -270,11 +294,10 @@ def main():
                             mobs.add(tower)
                             hazards.add(tower)
 
-                        # ★ボス生成
                         elif enemy_type == 'boss':
                             boss = Boss(all_sprites, hazards, player)
                             all_sprites.add(boss)
-                            mobs.add(boss)  # mobsに入れて当たり判定の対象にする
+                            mobs.add(boss)
 
                         enemy_script.pop(0)
 
@@ -309,7 +332,6 @@ def main():
                             all_sprites.add(s)
                             stars.add(s)
 
-                    # ★ 60秒未満なら壁を作る (ボス戦が始まったら壁の生成を止める)
                     if current_time >= TIME_STAGE3_START and current_time < TIME_BOSS_START:
                         w_top = Wall(is_top=True, from_right=True)
                         all_sprites.add(w_top)
@@ -320,7 +342,6 @@ def main():
 
             all_sprites.update()
 
-            # ★当たり判定
             hits = pygame.sprite.groupcollide(mobs, bullets, False, True)
             for mob, hit_bullets in hits.items():
                 if isinstance(mob, EnemyTower):
@@ -329,15 +350,12 @@ def main():
                         mob.kill()
                         score += 500
                 elif isinstance(mob, Boss):
-                    # ★ボスへのダメージ処理
                     mob.hp -= len(hit_bullets)
                     if mob.hp <= 0:
                         mob.kill()
                         score += 5000
-                        # クリア処理へ
                         mission_complete = True
                         complete_time = pygame.time.get_ticks()
-                        # 画面上の他の敵弾などを消す
                         hazards.empty()
                         mobs.empty()
                 else:
@@ -353,7 +371,6 @@ def main():
                     lives -= 1
                     death_time = pygame.time.get_ticks()
 
-            # 死亡時処理
             if not player.alive():
                 now = pygame.time.get_ticks()
                 if lives < 0:
@@ -367,12 +384,10 @@ def main():
                                   WIDTH // 2, HEIGHT - 100, RED)
                 else:
                     if now - death_time > 2000:
-                        # 復活処理
                         mobs.empty()
                         bullets.empty()
                         hazards.empty()
 
-                        # ボス戦で死んだ場合はボス直前から
                         if current_time >= TIME_BOSS_START:
                             current_time = TIME_BOSS_START - 2000
                         elif current_time >= 41000:
@@ -394,7 +409,6 @@ def main():
                         pygame.display.flip()
                         pygame.time.wait(500)
 
-            # 描画
             bg_color = BLACK
             if current_time >= TIME_STAGE3_START:
                 bg_color = (20, 20, 40)
@@ -418,18 +432,16 @@ def main():
                 draw_text(screen, "GAME OVER", 40,
                           WIDTH // 2, HEIGHT - 100, RED)
 
-            # ★クリア画面
             if mission_complete:
                 draw_text(screen, "MISSION COMPLETED", 40,
                           WIDTH // 2, HEIGHT // 2, YELLOW)
                 draw_text(screen, "CONGRATULATIONS!", 30,
                           WIDTH // 2, HEIGHT // 2 + 50, WHITE)
-                # 5秒後にタイトルへ
                 if pygame.time.get_ticks() - complete_time > 5000:
                     if score > high_score:
                         high_score = score
                         save_high_score(high_score)
-                    run_level = False  # メインループを抜けてタイトルへ戻る
+                    run_level = False
 
             pygame.display.flip()
 
