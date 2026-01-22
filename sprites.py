@@ -487,3 +487,190 @@ class WaveEnemy(pygame.sprite.Sprite):
 
         if self.rect.right < 0:
             self.kill()
+# (既存のimportsの下、ファイルの末尾に追加)
+
+# ==========================================
+# ★タワーから出てくる敵
+# ==========================================
+
+
+class TowerEnemy(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        # 小さな赤い四角
+        self.image = pygame.Surface((20, 20))
+        self.image.fill((255, 50, 50))
+        self.rect = self.image.get_rect()
+        self.rect.left = x
+        self.rect.centery = y
+        self.speedx = -5
+
+    def update(self):
+        self.rect.x += self.speedx
+        if self.rect.right < 0:
+            self.kill()
+
+# ==========================================
+# ★敵が出てくる鉄塔 (修正版)
+# ==========================================
+
+
+class EnemyTower(pygame.sprite.Sprite):
+    def __init__(self, x, is_top, all_sprites, mobs):
+        super().__init__()
+        self.image = pygame.Surface((40, 60))
+        self.image.fill(GREY)
+        # ハッチ（出口）を描画
+        pygame.draw.rect(self.image, (50, 50, 50), (5, 5, 30, 20))
+        # 鉄骨のような模様
+        pygame.draw.line(self.image, DARK_GREY, (0, 0), (40, 60), 2)
+        pygame.draw.line(self.image, DARK_GREY, (40, 0), (0, 60), 2)
+
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+
+        # ステージ3の壁(高さ80)に合わせて配置
+        if is_top:
+            self.rect.top = 80
+            self.spawn_y = self.rect.bottom - 10
+        else:
+            self.rect.bottom = HEIGHT - 80
+            self.spawn_y = self.rect.top + 15
+
+        self.hp = 5  # 耐久力
+        self.all_sprites = all_sprites
+        self.mobs = mobs
+
+        self.scroll_speed = -3
+
+        # 生成ロジック用変数
+        self.is_spawning = False
+        self.spawn_count = 0
+        self.spawn_timer = 0
+
+        # ★変更点1: 初期値を0にして、画面に入ったら即発射可能にする
+        self.cooldown_timer = 0
+        # ★変更点2: 次のウェーブまでの時間を短縮 (3秒 -> 2秒)
+        self.cooldown_delay = 2000
+
+    def update(self):
+        self.rect.x += self.scroll_speed
+
+        # 画面内に完全に入ったら動作開始
+        if 0 < self.rect.right < WIDTH:
+            now = pygame.time.get_ticks()
+
+            # 待機状態 -> 生成開始
+            if not self.is_spawning:
+                if now - self.cooldown_timer > self.cooldown_delay:
+                    self.is_spawning = True
+                    # ★変更点3: 生成開始と同時に1体目を即座に出す
+                    self.spawn_enemy()
+                    self.spawn_count = 1
+                    self.spawn_timer = now
+
+            # 生成中 (残り3体)
+            else:
+                if now - self.spawn_timer > 150:  # 0.15秒間隔で連射
+                    self.spawn_enemy()
+                    self.spawn_timer = now
+                    self.spawn_count += 1
+                    if self.spawn_count >= 4:
+                        self.is_spawning = False
+                        self.cooldown_timer = now
+
+        if self.rect.right < 0:
+            self.kill()
+
+    def spawn_enemy(self):
+        enemy = TowerEnemy(self.rect.centerx, self.spawn_y)
+        self.all_sprites.add(enemy)
+        self.mobs.add(enemy)
+# (既存のimportsの下、ファイルの末尾に追加)
+
+# ==========================================
+# ★ステージボス: ビッグ・コア
+# ==========================================
+
+
+class Boss(pygame.sprite.Sprite):
+    def __init__(self, all_sprites, hazards, player):
+        super().__init__()
+        # 巨大なボディ (青とグレー)
+        self.image = pygame.Surface((60, 100))
+        self.image.fill(GREY)
+        # コア部分 (弱点)
+        pygame.draw.circle(self.image, (0, 0, 255), (30, 50), 15)  # 青いコア
+        pygame.draw.circle(self.image, (255, 255, 255), (30, 50), 5)  # 光沢
+        # 上下のウィング
+        pygame.draw.rect(self.image, DARK_GREY, (0, 0, 60, 20))
+        pygame.draw.rect(self.image, DARK_GREY, (0, 80, 60, 20))
+
+        self.rect = self.image.get_rect()
+        self.rect.x = WIDTH + 50  # 画面外からスタート
+        self.rect.centery = HEIGHT // 2
+
+        self.all_sprites = all_sprites
+        self.hazards = hazards
+        self.player = player
+
+        self.hp = 80  # 耐久力 (かなり硬い)
+        self.max_hp = 80
+
+        # 状態管理 ('entry': 入場中, 'battle': 戦闘中)
+        self.state = 'entry'
+
+        self.speedy = 2
+        self.last_shot = 0
+        self.shoot_delay = 1200  # 1.2秒ごとに攻撃
+
+    def update(self):
+        # ■ 入場フェーズ
+        if self.state == 'entry':
+            self.rect.x -= 2
+            # 画面の右側定位置に来たら止まる
+            if self.rect.right < WIDTH - 50:
+                self.rect.right = WIDTH - 50
+                self.state = 'battle'
+
+        # ■ 戦闘フェーズ
+        elif self.state == 'battle':
+            # 上下移動
+            self.rect.y += self.speedy
+            if self.rect.top < 40 or self.rect.bottom > HEIGHT - 40:
+                self.speedy *= -1  # 端に当たったら反転
+
+            # 攻撃
+            now = pygame.time.get_ticks()
+            if now - self.last_shot > self.shoot_delay:
+                self.shoot()
+                self.last_shot = now
+
+        # HPバーの描画 (ボスの頭上に表示)
+        # ※実際の描画は本来drawで行うが、簡易的にimageを毎フレーム更新するか、
+        # あるいはmain側で描画するのが綺麗だが、ここでは簡易化のため省略し、
+        # 色の変化でダメージを表現する
+        if self.hp < self.max_hp * 0.3:  # ピンチになると赤くなる
+            pygame.draw.circle(self.image, (255, 0, 0), (30, 50), 15)
+        else:
+            pygame.draw.circle(self.image, (0, 0, 255), (30, 50), 15)
+
+    def shoot(self):
+        # プレイヤーへ向けた3方向弾
+        # プレイヤーへの角度を計算
+        dx = self.player.rect.centerx - self.rect.centerx
+        dy = self.player.rect.centery - self.rect.centery
+        base_angle = math.atan2(dy, dx)
+
+        offsets = [-0.3, 0, 0.3]  # 3方向の角度ずれ
+
+        for offset in offsets:
+            angle = base_angle + offset
+            vx = math.cos(angle) * 5
+            vy = math.sin(angle) * 5
+            bullet = EnemyLaser(self.rect.left, self.rect.centery, self.player)
+            # 速度を上書き
+            bullet.vx = vx
+            bullet.vy = vy
+            self.all_sprites.add(bullet)
+            self.hazards.add(bullet)
