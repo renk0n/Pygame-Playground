@@ -81,8 +81,15 @@ def init_stage_objects(current_time, all_sprites, stars, hazards):
     stars.empty()
     hazards.empty()
 
-    # --- Stage 1: 宇宙 ---
+    # --- 星の生成ロジック ---
+    # Stage 1 (宇宙) または Boss Stage (宇宙に戻る)
+    spawn_stars = False
     if current_time < TIME_STAGE3_START:
+        spawn_stars = True
+    elif current_time >= TIME_BOSS_START:
+        spawn_stars = True
+
+    if spawn_stars:
         for i in range(50):
             s = Star(from_right=False)
             all_sprites.add(s)
@@ -99,16 +106,6 @@ def init_stage_objects(current_time, all_sprites, stars, hazards):
             g_btm = FlatGround(x_pos, is_top=False)
             all_sprites.add(g_btm)
             hazards.add(g_btm)
-
-    # --- Stage 3: 要塞 ---
-    if current_time >= TIME_STAGE3_START and current_time < TIME_BOSS_START:
-        for i in range(5):
-            w = Wall(is_top=True, from_right=False)
-            all_sprites.add(w)
-            hazards.add(w)
-            w = Wall(is_top=False, from_right=False)
-            all_sprites.add(w)
-            hazards.add(w)
 
 
 def main():
@@ -146,8 +143,13 @@ def main():
         bottom_y = HEIGHT * 3 // 4
         center_y = HEIGHT // 2
 
-        base_script = [
-            # --- Stage 1: Space (0-20s) ---
+        # ----------------------------------------------------
+        # 敵と地形の出現スクリプト
+        # ----------------------------------------------------
+        base_script = []
+
+        # === Stage 1: Space (0-20s) ===
+        base_script.extend([
             {'time': 2000, 'type': 'formation', 'pos': 'top'},
             {'time': 4000, 'type': 'formation', 'pos': 'bottom'},
             {'time': 6000, 'type': 'formation', 'pos': 'top'},
@@ -173,70 +175,88 @@ def main():
                 'exact_y': center_y - 40, 'offset_x': 40},
             {'time': 16000, 'type': 'tracker',
                 'exact_y': center_y + 40, 'offset_x': 40},
-
-            # ★追加: Stage 1 最後の隙間に編隊
             {'time': 18000, 'type': 'formation', 'pos': 'top'},
+        ])
 
-            # --- Stage 2: Planet (20-40s) ---
-            # ★追加: Stage 2 開幕の隙間にウェーブ
+        # === Stage 2: Planet (20-40s) ===
+        base_script.extend([
             {'time': 21000, 'type': 'wave', 'base_y': center_y},
-
-            {'time': 22000, 'type': 'turret', 'offset_x': 0},
-            {'time': 22000, 'type': 'turret', 'offset_x': 60},
-            {'time': 22000, 'type': 'turret', 'offset_x': 120},
+            {'time': 22000, 'type': 'turret', 'offset_x': 0, 'base_y': 40},
+            {'time': 22000, 'type': 'turret', 'offset_x': 60, 'base_y': 40},
+            {'time': 22000, 'type': 'turret', 'offset_x': 120, 'base_y': 40},
             {'time': 23000, 'type': 'hopper', 'offset_x': 0},
-            {'time': 25000, 'type': 'turret', 'offset_x': 0},
+            {'time': 25000, 'type': 'turret', 'offset_x': 0, 'base_y': 40},
             {'time': 26500, 'type': 'hopper', 'offset_x': 0},
-            {'time': 28000, 'type': 'turret', 'offset_x': 0},
+            {'time': 28000, 'type': 'turret', 'offset_x': 0, 'base_y': 40},
             {'time': 29000, 'type': 'wave', 'base_y': top_y},
             {'time': 29500, 'type': 'wave', 'base_y': bottom_y},
             {'time': 30000, 'type': 'wave', 'base_y': top_y},
             {'time': 30500, 'type': 'wave', 'base_y': bottom_y},
             {'time': 30000, 'type': 'hopper', 'offset_x': 0},
             {'time': 30000, 'type': 'hopper', 'offset_x': 100},
-            {'time': 32000, 'type': 'turret', 'offset_x': 0},
-
-            # ★追加: Stage 2 中盤に編隊
+            {'time': 32000, 'type': 'turret', 'offset_x': 0, 'base_y': 40},
             {'time': 33000, 'type': 'formation', 'pos': 'bottom'},
-
             {'time': 34000, 'type': 'hopper', 'offset_x': 0},
-            {'time': 35000, 'type': 'turret', 'offset_x': 0},
-
-            # ★追加: Stage 2 後半にウェーブ
+            {'time': 35000, 'type': 'turret', 'offset_x': 0, 'base_y': 40},
             {'time': 36000, 'type': 'wave', 'base_y': top_y},
-
             {'time': 37000, 'type': 'hopper', 'offset_x': 0},
-            {'time': 38000, 'type': 'turret', 'offset_x': 0},
+            {'time': 38000, 'type': 'turret', 'offset_x': 0, 'base_y': 40},
+        ])
 
-            # --- Stage 3: Base (40-60s) ---
+        # === Stage 3: Base (40-60s) ===
+        # 壁の生成 (60000msの手前で終わらせることで、ボス戦開始時に自然に壁がなくなる)
+        map_timer = TIME_STAGE3_START
+        while map_timer < TIME_BOSS_START - 2000:  # 58秒くらいで壁生成終了
+            h_top = 80
+            h_bottom = 80
+            if 44000 < map_timer < 50000:
+                h_top = 200
+                h_bottom = 200
+
+            base_script.append(
+                {'time': map_timer, 'type': 'wall', 'is_top': True, 'height': h_top})
+            base_script.append(
+                {'time': map_timer, 'type': 'wall', 'is_top': False, 'height': h_bottom})
+            map_timer += 550
+
+        base_script.extend([
             {'time': 42000, 'type': 'tower', 'offset_x': 0},
-            {'time': 45000, 'type': 'tower', 'offset_x': 0},
-            {'time': 48000, 'type': 'tower', 'offset_x': 0},
-            {'time': 48000, 'type': 'tower', 'offset_x': 150},
+            {'time': 43000, 'type': 'turret', 'offset_x': 0, 'base_y': 80},
 
-            # ★追加: ボス前の隙間埋め (追尾 & タワー)
+            {'time': 46500, 'type': 'turret', 'offset_x': 0, 'base_y': 200},
+
             {'time': 50000, 'type': 'tracker', 'exact_y': top_y, 'offset_x': 0},
+            {'time': 51000, 'type': 'turret', 'offset_x': 0, 'base_y': 80},
             {'time': 52000, 'type': 'tower', 'offset_x': 0},
             {'time': 53000, 'type': 'tracker', 'exact_y': bottom_y, 'offset_x': 0},
+            {'time': 54000, 'type': 'turret', 'offset_x': 0, 'base_y': 80},
             {'time': 56000, 'type': 'tracker', 'exact_y': center_y, 'offset_x': 0},
 
-            # ★ BOSS
-            {'time': 60000, 'type': 'boss'},
-        ]
+            # BOSS
+            # 60000で背景が宇宙に戻るので、少し間をおいて63000でボス登場
+            {'time': 63000, 'type': 'boss'},
+        ])
+
+        base_script.sort(key=lambda x: x['time'])
         enemy_script = list(base_script)
 
         run_level = True
         while run_level:
             dt = clock.tick(FPS)
 
-            if player.alive() and not mission_complete:
+            if not mission_complete:
                 current_time += dt
                 if len(enemy_script) > 0:
                     while len(enemy_script) > 0 and current_time >= enemy_script[0]['time']:
                         next_spawn = enemy_script[0]
                         enemy_type = next_spawn['type']
 
-                        if enemy_type == 'formation':
+                        if enemy_type == 'wall':
+                            w = Wall(
+                                next_spawn['is_top'], from_right=True, height=next_spawn['height'])
+                            all_sprites.add(w)
+                            hazards.add(w)
+                        elif enemy_type == 'formation':
                             start_y = 0
                             y_dir = 1
                             if next_spawn['pos'] == 'top':
@@ -250,7 +270,6 @@ def main():
                                 fe = FormationEnemy(offset, start_y, y_dir)
                                 all_sprites.add(fe)
                                 mobs.add(fe)
-
                         elif enemy_type == 'tracker':
                             start_y = 0
                             offset_x = 0
@@ -265,27 +284,24 @@ def main():
                             te = TrackingEnemy(start_y, player, offset_x)
                             all_sprites.add(te)
                             mobs.add(te)
-
                         elif enemy_type == 'turret':
                             offset_x = next_spawn.get('offset_x', 0)
+                            base_y = next_spawn.get('base_y', 0)
                             turret = CeilingTurret(
-                                WIDTH + offset_x, player, all_sprites, hazards)
+                                WIDTH + offset_x, base_y, player, all_sprites, hazards)
                             all_sprites.add(turret)
                             mobs.add(turret)
-
                         elif enemy_type == 'hopper':
                             offset_x = next_spawn.get('offset_x', 0)
                             hopper = HoppingEnemy(
                                 WIDTH + offset_x, player, all_sprites, hazards)
                             all_sprites.add(hopper)
                             mobs.add(hopper)
-
                         elif enemy_type == 'wave':
                             base_y = next_spawn.get('base_y', HEIGHT // 2)
                             we = WaveEnemy(0, base_y)
                             all_sprites.add(we)
                             mobs.add(we)
-
                         elif enemy_type == 'tower':
                             offset_x = next_spawn.get('offset_x', 0)
                             tower = EnemyTower(
@@ -293,7 +309,6 @@ def main():
                             all_sprites.add(tower)
                             mobs.add(tower)
                             hazards.add(tower)
-
                         elif enemy_type == 'boss':
                             boss = Boss(all_sprites, hazards, player)
                             all_sprites.add(boss)
@@ -301,7 +316,7 @@ def main():
 
                         enemy_script.pop(0)
 
-            # 地面の継続生成
+            # Stage 2 地面
             if TIME_STAGE2_START <= current_time < TIME_STAGE3_START:
                 grounds = [h for h in hazards if isinstance(h, FlatGround)]
                 rightmost_x = 0
@@ -326,19 +341,18 @@ def main():
                         player.shoot()
 
                 elif event.type == pygame.USEREVENT + 2:
+                    # 星を出す条件：ステージ3未満、またはボス開始以降
+                    spawn_stars = False
                     if current_time < TIME_STAGE3_START:
+                        spawn_stars = True
+                    elif current_time >= TIME_BOSS_START:
+                        spawn_stars = True
+
+                    if spawn_stars:
                         if random.random() < 0.8:
                             s = Star(from_right=True)
                             all_sprites.add(s)
                             stars.add(s)
-
-                    if current_time >= TIME_STAGE3_START and current_time < TIME_BOSS_START:
-                        w_top = Wall(is_top=True, from_right=True)
-                        all_sprites.add(w_top)
-                        hazards.add(w_top)
-                        w_btm = Wall(is_top=False, from_right=True)
-                        all_sprites.add(w_btm)
-                        hazards.add(w_btm)
 
             all_sprites.update()
 
@@ -388,29 +402,56 @@ def main():
                         bullets.empty()
                         hazards.empty()
 
+                        # リスポーン処理
                         if current_time >= TIME_BOSS_START:
-                            current_time = TIME_BOSS_START - 2000
+                            # ★ボス戦リスポーン★
+                            # 宇宙背景に戻すため、時間を60000(ボス開始)に設定
+                            current_time = TIME_BOSS_START
+                            # スクリプトはボス以降のみ残す
+                            enemy_script = [
+                                e for e in base_script if e['time'] >= TIME_BOSS_START]
                         elif current_time >= 41000:
                             current_time = 41000
+                            enemy_script = [
+                                e for e in base_script if e['time'] > current_time]
                         elif current_time >= 21000:
                             current_time = 21000
+                            enemy_script = [
+                                e for e in base_script if e['time'] > current_time]
                         else:
                             current_time = 1000
-
-                        enemy_script = [
-                            e for e in base_script if e['time'] > current_time]
+                            enemy_script = [
+                                e for e in base_script if e['time'] > current_time]
 
                         init_stage_objects(
                             current_time, all_sprites, stars, hazards)
                         player = Player(all_sprites, bullets)
                         all_sprites.add(player)
 
+                        # ★ステージ3途中(ボス前)なら壁を埋めるが、ボス戦(>=60000)なら埋めない
+                        if TIME_STAGE3_START <= current_time < TIME_BOSS_START:
+                            for wall_x in range(0, WIDTH + 100, 100):
+                                wt = Wall(
+                                    is_top=True, from_right=True, height=80)
+                                wt.rect.x = wall_x
+                                all_sprites.add(wt)
+                                hazards.add(wt)
+                                wb = Wall(is_top=False,
+                                          from_right=True, height=80)
+                                wb.rect.x = wall_x
+                                all_sprites.add(wb)
+                                hazards.add(wb)
+
                         screen.fill(BLACK)
                         pygame.display.flip()
                         pygame.time.wait(500)
 
             bg_color = BLACK
-            if current_time >= TIME_STAGE3_START:
+            if current_time >= TIME_BOSS_START:
+                # ボス戦: 黒 (宇宙)
+                bg_color = BLACK
+            elif current_time >= TIME_STAGE3_START:
+                # ステージ3: 基地 (紺)
                 bg_color = (20, 20, 40)
 
             screen.fill(bg_color)
@@ -427,10 +468,6 @@ def main():
             elif current_time >= TIME_STAGE2_START:
                 stage_name = "PLANET"
             draw_text(screen, stage_name, 14, 40, HEIGHT - 20, GREY)
-
-            if lives < 0:
-                draw_text(screen, "GAME OVER", 40,
-                          WIDTH // 2, HEIGHT - 100, RED)
 
             if mission_complete:
                 draw_text(screen, "MISSION COMPLETED", 40,
