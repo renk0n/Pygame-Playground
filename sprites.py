@@ -260,31 +260,45 @@ class CeilingTurret(pygame.sprite.Sprite):
         self.hazards.add(laser)
 
 # ==========================================
-# 敵の弾 (レーザー) - ★サイズ3倍
+# 敵の弾 (レーザー) - ★向きに合わせて回転
 # ==========================================
 
 
 class EnemyLaser(pygame.sprite.Sprite):
     def __init__(self, x, y, player):
         super().__init__()
-        # ★サイズ変更: 10x10 -> 30x30
-        self.image = load_image("laser.png", 30, 30)
+        # サイズ: 30x30。回転の基準となる元の画像を保持。
+        self.original_image = load_image("laser.png", 30, 30)
+        # 画像がない場合のバックアップ（黄色い四角）
         try:
             pygame.image.load(os.path.join(img_folder, "laser.png"))
         except:
-            self.image.fill(YELLOW)
+            self.original_image.fill(YELLOW)
 
-        self.rect = self.image.get_rect()
-        self.rect.center = (x, y)
+        # 初期状態のimageを設定
+        self.image = self.original_image.copy()
 
+        # 速度と角度の計算
         speed = 4
-
         dx = player.rect.centerx - x
         dy = player.rect.centery - y
+        # 角度（ラジアン）を計算
         angle = math.atan2(dy, dx)
 
         self.vx = math.cos(angle) * speed
         self.vy = math.sin(angle) * speed
+
+        # --- 画像の回転処理 ---
+        # ラジアンを度数法に変換。
+        # pygame.transform.rotate は反時計回り。
+        # 画像が元々「右向き」だと仮定し、進行方向に向けるためマイナスの角度で回転。
+        angle_degrees = math.degrees(angle)
+        self.image = pygame.transform.rotate(
+            self.original_image, -angle_degrees)
+
+        # 回転すると画像の矩形サイズが変わるので、中心位置を元の発生源に合わせ直す
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
 
     def update(self):
         self.rect.x += self.vx
@@ -302,7 +316,7 @@ class EnemyLaser(pygame.sprite.Sprite):
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-        # ★サイズ変更: 20x10 -> 60x30
+        # ★サイズ変更: 60x30
         self.image = load_image("bullet.png", 60, 30)
         try:
             pygame.image.load(os.path.join(img_folder, "bullet.png"))
@@ -567,7 +581,7 @@ class WaveEnemy(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# タワーから出てくる敵 (サイズ変更)
+# タワーから出てくる敵 (90度回転)
 # ==========================================
 
 
@@ -576,6 +590,9 @@ class TowerEnemy(pygame.sprite.Sprite):
         super().__init__()
         # サイズ: 20x32
         self.image = load_image("enemy_small.png", 20, 32)
+        # 画像を90度左に回転
+        self.image = pygame.transform.rotate(self.image, 90)
+
         try:
             pygame.image.load(os.path.join(img_folder, "enemy_small.png"))
         except:

@@ -39,12 +39,12 @@ def show_start_screen(screen, high_score):
     waiting = True
     while waiting:
         screen.fill(BLACK)
-        draw_text(screen, "Konami", 30, WIDTH // 2, HEIGHT // 6, WHITE)
-        draw_text(screen, "GRADIUS", 80, WIDTH //
+        draw_text(screen, "", 30, WIDTH // 2, HEIGHT // 6, WHITE)
+        draw_text(screen, "SPACE SHOOTER", 80, WIDTH //
                   2 + 4, HEIGHT // 4 + 4, (200, 0, 0))
-        draw_text(screen, "GRADIUS", 80, WIDTH //
+        draw_text(screen, "SPACE SHOOTER", 80, WIDTH //
                   2, HEIGHT // 4, (0, 100, 255))
-        draw_text(screen, "(c) KONAMI 1986", 20,
+        draw_text(screen, "(c) earth 1986", 20,
                   WIDTH // 2, HEIGHT // 2, WHITE)
         draw_text(screen, f"HI  {high_score:07}", 25,
                   WIDTH // 2, HEIGHT // 2 + 40, (255, 100, 100))
