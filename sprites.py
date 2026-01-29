@@ -1,7 +1,41 @@
 import pygame
 import random
 import math
+import os
 from settings import *
+
+# ==========================================
+# 画像フォルダの場所を特定
+# ==========================================
+game_folder = os.path.dirname(__file__)
+img_folder = os.path.join(game_folder, 'images')
+
+# ==========================================
+# 画像読み込み用ヘルパー関数
+# ==========================================
+
+
+def load_image(filename, width, height, color_key=BLACK, flip_x=False):
+    """
+    imagesフォルダから画像を読み込み、リサイズして返す。
+    flip_x=True なら左右反転させる。
+    """
+    try:
+        file_path = os.path.join(img_folder, filename)
+        image = pygame.image.load(file_path).convert()
+        image = pygame.transform.scale(image, (width, height))
+
+        # 左右反転フラグがあれば反転
+        if flip_x:
+            image = pygame.transform.flip(image, True, False)
+
+        if color_key is not None:
+            image.set_colorkey(color_key)
+        return image
+    except (FileNotFoundError, pygame.error):
+        # 画像がない場合は四角形を返す
+        image = pygame.Surface((width, height))
+        return image
 
 # ==========================================
 # プレイヤー
@@ -11,8 +45,16 @@ from settings import *
 class Player(pygame.sprite.Sprite):
     def __init__(self, all_sprites, bullets):
         super().__init__()
-        self.image = pygame.Surface((50, 30))
-        self.image.fill(GREEN)
+        # サイズ: 65x40
+        self.width = 65
+        self.height = 40
+        self.image = load_image("player.png", self.width, self.height)
+
+        try:
+            pygame.image.load(os.path.join(img_folder, "player.png"))
+        except:
+            self.image.fill(GREEN)
+
         self.rect = self.image.get_rect()
         self.rect.centery = HEIGHT // 2
         self.rect.left = 50
@@ -51,20 +93,26 @@ class Player(pygame.sprite.Sprite):
             self.rect.top = 0
 
     def shoot(self):
+        # 弾の発射位置を調整（自機の右端から出るように）
         bullet = Bullet(self.rect.right, self.rect.centery)
         self.all_sprites.add(bullet)
         self.bullets.add(bullet)
 
 # ==========================================
-# 普通の敵
+# 普通の敵 (赤)
 # ==========================================
 
 
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.image = pygame.Surface((30, 30))
-        self.image.fill(RED)
+        # サイズ: 45x45
+        self.image = load_image("enemy.png", 45, 45)
+        try:
+            pygame.image.load(os.path.join(img_folder, "enemy.png"))
+        except:
+            self.image.fill(RED)
+
         self.rect = self.image.get_rect()
         self.rect.x = random.randrange(WIDTH + 10, WIDTH + 100)
         self.rect.y = random.randrange(50, HEIGHT - 50)
@@ -83,13 +131,17 @@ class Enemy(pygame.sprite.Sprite):
 class FormationEnemy(pygame.sprite.Sprite):
     def __init__(self, offset_x, start_y, y_direction):
         super().__init__()
-        self.radius = 15
-        self.image = pygame.Surface(
-            (self.radius * 2, self.radius * 2), pygame.SRCALPHA)
-        pygame.draw.circle(self.image, (0, 255, 255),
-                           (self.radius, self.radius), self.radius)
-        self.rect = self.image.get_rect()
+        # サイズ: 45
+        size = 45
+        self.image = load_image("enemy_ball.png", size, size)
+        try:
+            pygame.image.load(os.path.join(img_folder, "enemy_ball.png"))
+        except:
+            pygame.draw.circle(self.image, (0, 255, 255),
+                               (size//2, size//2), size//2)
+            self.image.set_colorkey(BLACK)
 
+        self.rect = self.image.get_rect()
         self.rect.x = WIDTH + offset_x
         self.rect.y = start_y
 
@@ -126,10 +178,18 @@ class TrackingEnemy(pygame.sprite.Sprite):
     def __init__(self, start_y, player, offset_x=0):
         super().__init__()
         self.player = player
-        size = 30
-        self.image = pygame.Surface((size, size), pygame.SRCALPHA)
-        points = [(0, size // 2), (size, 0), (size, size)]
-        pygame.draw.polygon(self.image, (255, 0, 255), points)
+        # サイズ: 45x45
+        size = 45
+        # 左向きに反転
+        self.image = load_image("enemy_track.png", size, size, flip_x=True)
+
+        try:
+            pygame.image.load(os.path.join(img_folder, "enemy_track.png"))
+        except:
+            points = [(0, size // 2), (size, 0), (size, size)]
+            pygame.draw.polygon(self.image, (255, 0, 255), points)
+            self.image.set_colorkey(BLACK)
+
         self.rect = self.image.get_rect()
         self.rect.x = WIDTH + offset_x
         self.rect.y = start_y
@@ -162,13 +222,17 @@ class TrackingEnemy(pygame.sprite.Sprite):
 class CeilingTurret(pygame.sprite.Sprite):
     def __init__(self, x, y, player, all_sprites, hazards):
         super().__init__()
-        self.image = pygame.Surface((30, 30))
-        self.image.fill(RED)
-        pygame.draw.rect(self.image, (200, 0, 0), (10, 15, 10, 15))
+        # サイズ: 45x45
+        self.image = load_image("turret.png", 45, 45)
+        try:
+            pygame.image.load(os.path.join(img_folder, "turret.png"))
+        except:
+            self.image.fill(RED)
+            pygame.draw.rect(self.image, (200, 0, 0), (10, 15, 10, 15))
 
         self.rect = self.image.get_rect()
         self.rect.x = x
-        self.rect.y = y  # 引数でY座標を指定するように変更
+        self.rect.y = y
 
         self.player = player
         self.all_sprites = all_sprites
@@ -196,15 +260,20 @@ class CeilingTurret(pygame.sprite.Sprite):
         self.hazards.add(laser)
 
 # ==========================================
-# 敵の弾 (レーザー)
+# 敵の弾 (レーザー) - ★サイズ3倍
 # ==========================================
 
 
 class EnemyLaser(pygame.sprite.Sprite):
     def __init__(self, x, y, player):
         super().__init__()
-        self.image = pygame.Surface((10, 10))
-        self.image.fill(YELLOW)
+        # ★サイズ変更: 10x10 -> 30x30
+        self.image = load_image("laser.png", 30, 30)
+        try:
+            pygame.image.load(os.path.join(img_folder, "laser.png"))
+        except:
+            self.image.fill(YELLOW)
+
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
 
@@ -226,15 +295,20 @@ class EnemyLaser(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# プレイヤーの弾
+# プレイヤーの弾 - ★サイズ3倍
 # ==========================================
 
 
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-        self.image = pygame.Surface((20, 10))
-        self.image.fill(YELLOW)
+        # ★サイズ変更: 20x10 -> 60x30
+        self.image = load_image("bullet.png", 60, 30)
+        try:
+            pygame.image.load(os.path.join(img_folder, "bullet.png"))
+        except:
+            self.image.fill(YELLOW)
+
         self.rect = self.image.get_rect()
         self.rect.left = x
         self.rect.centery = y
@@ -347,7 +421,7 @@ class Mountain(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# Stage 3: 壁 (改造: 高さ可変)
+# Stage 3: 壁
 # ==========================================
 
 
@@ -355,7 +429,6 @@ class Wall(pygame.sprite.Sprite):
     def __init__(self, is_top, from_right=True, height=80):
         super().__init__()
         width = 100
-        # heightを引数から設定
         self.image = pygame.Surface((width, height))
         self.image.fill(GREY)
         pygame.draw.rect(self.image, WHITE, (0, 0, width, height), 2)
@@ -382,15 +455,20 @@ class Wall(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# ホッピングする敵 (AI強化版)
+# ホッピングする敵
 # ==========================================
 
 
 class HoppingEnemy(pygame.sprite.Sprite):
     def __init__(self, x, player, all_sprites, hazards):
         super().__init__()
-        self.image = pygame.Surface((30, 30))
-        self.image.fill((0, 255, 255))
+        # サイズ: 45x45
+        self.image = load_image("hopper.png", 45, 45)
+        try:
+            pygame.image.load(os.path.join(img_folder, "hopper.png"))
+        except:
+            self.image.fill((0, 255, 255))
+
         self.rect = self.image.get_rect()
 
         self.ground_y = HEIGHT - 40
@@ -408,9 +486,9 @@ class HoppingEnemy(pygame.sprite.Sprite):
         self.last_shot = pygame.time.get_ticks()
         self.shoot_delay = random.randrange(1500, 2500)
 
-        self.scroll_speed = -3   # 背景スクロール速度
-        self.move_speed = 3.5    # 敵自身の移動速度
-        self.vx = self.scroll_speed  # 初期速度
+        self.scroll_speed = -3
+        self.move_speed = 3.5
+        self.vx = self.scroll_speed
 
     def update(self):
         self.vy += self.gravity
@@ -418,22 +496,18 @@ class HoppingEnemy(pygame.sprite.Sprite):
 
         self.rect.x += self.vx
 
-        # 着地判定 (簡易的に画面下端付近)
         if self.rect.bottom >= self.ground_y:
             self.rect.bottom = self.ground_y
             self.vy = self.jump_power
 
-            # AI: プレイヤーの位置に応じて動きを変える
             dist_x = self.player.rect.centerx - self.rect.centerx
             if abs(dist_x) < 40:
-                # またぐ動き
                 current_rel_speed = self.vx - self.scroll_speed
                 if current_rel_speed > 0:
                     self.vx = self.scroll_speed - self.move_speed
                 else:
                     self.vx = self.scroll_speed + self.move_speed
             else:
-                # 接近
                 if dist_x > 0:
                     self.vx = self.scroll_speed + self.move_speed
                 else:
@@ -456,16 +530,21 @@ class HoppingEnemy(pygame.sprite.Sprite):
         self.hazards.add(laser)
 
 # ==========================================
-# 波線で進む飛行機
+# 波線で進む飛行機 (オレンジ)
 # ==========================================
 
 
 class WaveEnemy(pygame.sprite.Sprite):
     def __init__(self, offset_x, base_y):
         super().__init__()
-        self.image = pygame.Surface((40, 30), pygame.SRCALPHA)
-        points = [(0, 15), (40, 0), (40, 30)]
-        pygame.draw.polygon(self.image, (255, 165, 0), points)  # Orange
+        # サイズ: 60x45, 左向き
+        self.image = load_image("enemy_wave.png", 60, 45, flip_x=True)
+        try:
+            pygame.image.load(os.path.join(img_folder, "enemy_wave.png"))
+        except:
+            points = [(0, 15), (40, 0), (40, 30)]
+            pygame.draw.polygon(self.image, (255, 165, 0), points)
+            self.image.set_colorkey(BLACK)
 
         self.rect = self.image.get_rect()
         self.rect.x = WIDTH + offset_x
@@ -495,9 +574,13 @@ class WaveEnemy(pygame.sprite.Sprite):
 class TowerEnemy(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
-        # ★ 幅を20 -> 12に変更
-        self.image = pygame.Surface((12, 20))
-        self.image.fill((255, 50, 50))
+        # サイズ: 20x32
+        self.image = load_image("enemy_small.png", 20, 32)
+        try:
+            pygame.image.load(os.path.join(img_folder, "enemy_small.png"))
+        except:
+            self.image.fill((255, 50, 50))
+
         self.rect = self.image.get_rect()
         self.rect.left = x
         self.rect.centery = y
@@ -509,18 +592,21 @@ class TowerEnemy(pygame.sprite.Sprite):
             self.kill()
 
 # ==========================================
-# 敵が出てくる鉄塔 (間隔調整)
+# 敵が出てくる鉄塔
 # ==========================================
 
 
 class EnemyTower(pygame.sprite.Sprite):
     def __init__(self, x, is_top, all_sprites, mobs):
         super().__init__()
-        self.image = pygame.Surface((40, 60))
-        self.image.fill(GREY)
-        pygame.draw.rect(self.image, (50, 50, 50), (5, 5, 30, 20))
-        pygame.draw.line(self.image, DARK_GREY, (0, 0), (40, 60), 2)
-        pygame.draw.line(self.image, DARK_GREY, (40, 0), (0, 60), 2)
+        self.image = load_image("tower.png", 40, 60)
+        try:
+            pygame.image.load(os.path.join(img_folder, "tower.png"))
+        except:
+            self.image.fill(GREY)
+            pygame.draw.rect(self.image, (50, 50, 50), (5, 5, 30, 20))
+            pygame.draw.line(self.image, DARK_GREY, (0, 0), (40, 60), 2)
+            pygame.draw.line(self.image, DARK_GREY, (40, 0), (0, 60), 2)
 
         self.rect = self.image.get_rect()
         self.rect.x = x
@@ -555,7 +641,6 @@ class EnemyTower(pygame.sprite.Sprite):
                     self.spawn_count = 1
                     self.spawn_timer = now
             else:
-                # ★ 出現間隔を150 -> 400に広げて敵同士の距離を確保
                 if now - self.spawn_timer > 400:
                     self.spawn_enemy()
                     self.spawn_timer = now
@@ -580,12 +665,17 @@ class EnemyTower(pygame.sprite.Sprite):
 class Boss(pygame.sprite.Sprite):
     def __init__(self, all_sprites, hazards, player):
         super().__init__()
-        self.image = pygame.Surface((60, 100))
-        self.image.fill(GREY)
-        pygame.draw.circle(self.image, (0, 0, 255), (30, 50), 15)
-        pygame.draw.circle(self.image, (255, 255, 255), (30, 50), 5)
-        pygame.draw.rect(self.image, DARK_GREY, (0, 0, 60, 20))
-        pygame.draw.rect(self.image, DARK_GREY, (0, 80, 60, 20))
+        # サイズ: 220x120
+        self.image = load_image("boss.png", 220, 120)
+        try:
+            pygame.image.load(os.path.join(img_folder, "boss.png"))
+        except:
+            self.image = pygame.Surface((60, 100))
+            self.image.fill(GREY)
+            pygame.draw.circle(self.image, (0, 0, 255), (30, 50), 15)
+            pygame.draw.circle(self.image, (255, 255, 255), (30, 50), 5)
+            pygame.draw.rect(self.image, DARK_GREY, (0, 0, 60, 20))
+            pygame.draw.rect(self.image, DARK_GREY, (0, 80, 60, 20))
 
         self.rect = self.image.get_rect()
         self.rect.x = WIDTH + 50
@@ -620,9 +710,10 @@ class Boss(pygame.sprite.Sprite):
                 self.last_shot = now
 
         if self.hp < self.max_hp * 0.3:
-            pygame.draw.circle(self.image, (255, 0, 0), (30, 50), 15)
-        else:
-            pygame.draw.circle(self.image, (0, 0, 255), (30, 50), 15)
+            try:
+                pygame.image.load(os.path.join(img_folder, "boss.png"))
+            except:
+                pygame.draw.circle(self.image, (255, 0, 0), (30, 50), 15)
 
     def shoot(self):
         dx = self.player.rect.centerx - self.rect.centerx
