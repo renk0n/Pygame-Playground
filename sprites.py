@@ -3,13 +3,20 @@ import random
 import math
 import os
 from settings import *
+import sys
 
-# ==========================================
-# 画像フォルダの場所を特定
-# ==========================================
-game_folder = os.path.dirname(__file__)
+# ...他のimport文...
+
+# ここから書き換え
+if getattr(sys, 'frozen', False):
+    # exe化されたときは、exeファイルがある場所を基準にする
+    game_folder = os.path.dirname(sys.executable)
+else:
+    # 普通に実行するときは、ファイルの場所を基準にする
+    game_folder = os.path.dirname(__file__)
+
 img_folder = os.path.join(game_folder, 'images')
-
+# 書き換えここまで
 # ==========================================
 # 画像読み込み用ヘルパー関数
 # ==========================================
